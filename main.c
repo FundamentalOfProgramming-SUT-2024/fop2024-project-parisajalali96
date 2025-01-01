@@ -23,6 +23,175 @@ struct scores {
 struct scores ranks [MAX_SIZE];
 int score_count = 0;
 
+void pick_one (int highlight, char* menu_name, char * options[], int n) {
+    attron(COLOR_PAIR(1));
+    printw("%s: \n", menu_name);
+    attroff(COLOR_PAIR(1));
+
+    for (int i = 0; i < n; i++) {
+        if (i == highlight) {
+            attron(A_REVERSE);
+            printw("> %s\n", options[i]);
+            attroff(A_REVERSE);
+        } else {
+            printw("  %s\n", options[i]);
+        }
+    }
+
+}
+
+void difficulty () {
+    int ch;
+    int choice = 0;
+    char menu_name [50] = {"Choose difficulty"};
+    char * options[] = {"Hard", "Medium", "Hard", "Exit"};
+    
+    while (1) {
+        clear();
+        pick_one(choice, menu_name, options, 3);
+        
+        refresh();
+        
+        ch = getch();
+        if (ch == KEY_UP && choice > 0) choice--;
+        else if (ch == KEY_DOWN && choice < 4) choice++;
+        else if (ch == '\n') {
+            if (choice == 0) { // hard
+                getch();
+                refresh();
+                break;
+            } else if ( choice == 1) { //medium
+                getch();
+                refresh();
+                break;
+            } else if ( choice == 2) {//easy
+                getch();
+                refresh();
+                break;
+            }
+        }
+    }
+}
+
+void init_colors() {
+    start_color();
+    init_pair(2, COLOR_RED, COLOR_BLACK);
+    init_pair(3, COLOR_CYAN, COLOR_BLACK);
+    init_pair(6, COLOR_MAGENTA, COLOR_BLACK);
+    init_pair(4, COLOR_BLUE, COLOR_BLACK);
+    init_pair(5, COLOR_YELLOW, COLOR_BLACK);
+}
+
+void customize_menu () {
+    int ch;
+    int choice = 0;
+    char menu_name [50]= {"Customize"};
+    char * options[] = {"PINK", "YELLOW", "BLUE", "RED", "CYAN"};
+    
+    while (1) {
+        clear();
+        pick_one(choice, menu_name, options, 5);
+        
+        refresh();
+        
+        ch = getch();
+        if (ch == KEY_UP && choice > 0) choice--;
+        else if (ch == KEY_DOWN && choice < 4) choice++;
+        else if (ch == '\n') {
+            if (choice == 0) { // pink
+                clear();
+                difficulty();
+                refresh();
+            } else if (choice == 1) {//yellow
+                clear();
+                difficulty();
+                refresh();
+            } else if (choice == 2) {//blue
+                clear();
+                difficulty();
+                refresh();
+            } else if (choice == 1) {//red
+                clear();
+                difficulty();
+                refresh();
+            } else if (choice == 1) {//cyan
+                clear();
+                difficulty();
+                refresh();
+            }
+        }
+    }
+}
+
+void setting_menu (){
+    int ch;
+    int choice = 0;
+    char menu_name [50] = {"Setting"};
+    char * options[] = {"Difficulty", "Customize", "Music", "Exit"};
+    
+    while (1) {
+        clear();
+        pick_one(choice, menu_name, options, 4);
+        
+        refresh();
+        
+        ch = getch();
+        if (ch == KEY_UP && choice > 0) choice--;
+        else if (ch == KEY_DOWN && choice < 4) choice++;
+        else if (ch == '\n') {
+            if (choice == 0) { //difficulty
+                clear();
+                difficulty();
+                refresh();
+            } else if (choice == 1) { // customize
+                clear();
+                customize_menu();
+                refresh();
+            } else if (choice == 2) { //Music
+                clear();
+                refresh();
+
+            } else if (choice == 3) { //Exit
+                clear();
+                refresh();
+            }
+        }
+    }
+}
+        
+void start_game_menu () {
+    int ch;
+    int choice = 0;
+    char * options [] = {"New Game", "Continue Previous Game", "Game Settings", "Exit"};
+    char menu_name[50] = {"Game Menu"};
+    while (1) {
+        clear();
+        pick_one(choice, menu_name, options, 4);
+        refresh();
+        
+        ch = getch();
+        if (ch == KEY_UP && choice > 0) choice--;
+        else if (ch == KEY_DOWN && choice < 4) choice++;
+        else if (ch == '\n') {
+            if (choice == 0) { // New Game
+                getch();
+                refresh();
+            } else if (choice == 1) {// Prev Game (make the menu later)
+                getch();
+                refresh();
+            } else if (choice == 2) {//Settings
+                setting_menu();
+                getch();
+                refresh();
+            } else if (choice == 3) {// Exit
+                getch();
+                refresh();
+            }
+        }
+        
+    }
+}
+
 bool valid_pass(char* password) {
     if (strlen(password) < 7) {
         return false;
@@ -140,31 +309,15 @@ void forgot_pass (char* username) {
     }
 }
 
-void play_menu_choices (int highlight) {
-    attron(COLOR_PAIR(1));
-    printw("Play Menu: \n");
-    attroff(COLOR_PAIR(1));
-
-    char* options[] = {"Login", "Register", "Forgot Password", "Exit"};
-    for (int i = 0; i < 4; i++) {
-        if (i == highlight) {
-            attron(A_REVERSE);
-            printw("> %s\n", options[i]);
-            attroff(A_REVERSE);
-        } else {
-            printw("  %s\n", options[i]);
-        }
-    }
-}
-
 void play_menu () {
     char username[50], password[50], email[50];
     int ch;
     int choice = 0;
-    
+    char menu_name [50] = {"Play Menu"};
+    char * options [] = { "Login", "Register", "Forgot Password", "Exit"};
     while (1) {
         clear();
-        play_menu_choices(choice);
+        pick_one(choice, menu_name, options, 4);
         refresh();
         
         ch = getch();
@@ -179,6 +332,7 @@ void play_menu () {
                 
                 if (validate_username(username, password)) {
                     printw("\nLogin successful!");
+                    start_game_menu();
                 } else {
                     printw("\nInvalid password.");
                 }
@@ -237,23 +391,6 @@ void play_menu () {
     }
 }
 
-void main_menu_choice (int highlight) {
-    
-    attron(COLOR_PAIR(1));
-    printw("Main Menu: \n");
-    attroff(COLOR_PAIR(1));
-
-    char* options[] = {"Play", "Hall of Fame"};
-    for (int i = 0; i < 2; i++) {
-        if (i == highlight) {
-            attron(A_REVERSE);
-            printw("> %s\n", options[i]);
-            attroff(A_REVERSE);
-        } else {
-            printw("  %s\n", options[i]);
-        }
-    }
-}
 void load_hall () {
     FILE * file = fopen("hall_of_fame.txt", "r");
     if(!file) return;
@@ -320,10 +457,11 @@ void hall_of_fame () {
 void main_menu (){
     char username[50], password[50], email[50];
     int ch, choice = 0;
-    
+    char menu_name [50] = {"Main Menu"};
+    char * options [] = { "Play", "Hall of Fame"};
     while (1) {
         clear();
-        main_menu_choice(choice);
+        pick_one(choice, menu_name, options, 2);
         refresh();
         
         ch = getch();
@@ -349,8 +487,9 @@ void load_welcome_page () {
     clear();
     printw("Welcome to the Dungeon of Doom!\n");
     refresh();
-    
+    getch();
 }
+
 int main() {
 
     initscr();
@@ -359,9 +498,9 @@ int main() {
     noecho();
     
     if (has_colors()) {
-        start_color();
-        init_pair(1, COLOR_BLACK, COLOR_WHITE);
+        init_colors();
     }
+    
     load_welcome_page();
     main_menu();
     
