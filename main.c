@@ -3,14 +3,28 @@
 //  rogue (parisa's version)
 //
 //  Created by parisa on 12/22/24.
-//
 #include <stdio.h>
 #include <curses.h>
 #include <string.h>
 #include <stdbool.h>
 #include <ctype.h>
 #include <time.h>
+#include <stdlib.h>
+#include <locale.h>
 #define MAX_SIZE 100
+#define HEIGHT 25
+#define WIDTH 50
+#define ROOM_MIN_SIZE 4
+#define ROOM_MAX_SIZE 10
+#define ROOM_COUNT 6
+#define CORRIDOR_VISIBLE 4
+struct ROOM {
+    int x, y, height, width;
+};
+
+char map [HEIGHT][WIDTH];
+bool visible[HEIGHT][WIDTH];
+bool visited[HEIGHT][WIDTH];
 
 struct scores {
     char name [50];
@@ -22,6 +36,8 @@ struct scores {
 
 struct scores ranks [MAX_SIZE];
 int score_count = 0;
+
+int hero_color = 1;
 
 void pick_one (int highlight, char* menu_name, char * options[], int n) {
     attron(COLOR_PAIR(1));
@@ -99,29 +115,212 @@ void customize_menu () {
         else if (ch == KEY_DOWN && choice < 4) choice++;
         else if (ch == '\n') {
             if (choice == 0) { // pink
-                clear();
-                difficulty();
-                refresh();
+                hero_color = 6;
+                break;
             } else if (choice == 1) {//yellow
-                clear();
-                difficulty();
-                refresh();
+                hero_color = 5;
+                break;
             } else if (choice == 2) {//blue
-                clear();
-                difficulty();
-                refresh();
+                hero_color = 4;
+                break;
             } else if (choice == 1) {//red
-                clear();
-                difficulty();
-                refresh();
+                hero_color = 2;
+                break;
             } else if (choice == 1) {//cyan
-                clear();
-                difficulty();
-                refresh();
+                hero_color = 3;
+                break;
             }
         }
     }
 }
+
+bool room_overlap (struct ROOM r1, struct ROOM r2) {
+    return !(r1.x + r1.width < r2.x || r1.x > r2.x + r2.width || r1.y + r1.height < r2.y || r1.y > r2.y + r2.height);
+}
+
+void init_map () {
+    
+    for ( int i = 0; i < HEIGHT; i ++) {
+        for (int j = 0; j < WIDTH; j ++) {
+            map[i][j] = ' ';
+            visible[i][j] = false;
+        }
+    }
+}
+
+void add_room (struct ROOM room) {
+    for (int y = room.y; y < room.y + room.height; y++) {
+        for (int x = room.x; x < room.x + room.width; x++) {
+            if (y == room.y || y == room.y + room.height - 1) {
+                map[y][x] = '-';
+            } else if (x == room.x || x == room.x + room.width - 1) {
+                map[y][x] = '|';
+            } else {
+                map[y][x] = '.';
+            }
+        }
+    }
+}
+
+void corridor (int x1, int y1, int x2, int y2) {
+    int start_x = x1;
+    int start_y = y1;
+    bool door_placed = false;
+    
+    if (rand() % 2) {
+        while (x1 != x2) {
+            if (!door_placed && ( map[y1][x1] == '|' || map[y1][x1] == '-'))  {
+                map[y1][x1] = '+';
+                door_placed = true;
+            }  else if ( map[y1][x1] == ' ')  {
+                map[y1][x1] = '#';
+            }
+            x1 += (x2 > x1) ? 1 : -1;
+        }
+        
+        while (y1 != y2) {
+            if (!door_placed && ( map[y1][x1] == '|' || map[y1][x1] == '-'))  {
+                map[y1][x1] = '+';
+                door_placed = true;
+            }  else if ( map[y1][x1] == ' ')  {
+                map[y1][x1] = '#';
+            }
+            y1 += (y2 > y1) ? 1 : -1;
+        }
+    } else {
+        
+        while (y1 != y2) {
+            if (!door_placed && ( map[y1][x1] == '|' || map[y1][x1] == '-'))  {
+                map[y1][x1] = '+';
+                door_placed = true;
+            }  else if ( map[y1][x1] == ' ')  {
+                map[y1][x1] = '#';
+            }
+            y1 += (y2 > y1) ? 1 : -1;
+        }
+        
+        while (x1 != x2) {
+            if (!door_placed && ( map[y1][x1] == '|' || map[y1][x1] == '-'))  {
+                map[y1][x1] = '+';
+                door_placed = true;
+            }  else if ( map[y1][x1] == ' ')  {
+                map[y1][x1] = '#';
+            }
+            x1 += (x2 > x1) ? 1 : -1;
+        }
+    }
+}
+
+void reveal_corridor (int px, int py) {
+    
+    for (int dy = -CORRIDOR_VISIBLE; dy <= CORRIDOR_VISIBLE; dy++) {
+        for (int dx = -CORRIDOR_VISIBLE; dx <= CORRIDOR_VISIBLE; dx++) {
+            int nx= dx + px;
+            int ny= dy + py;
+            if (nx >= 0 && nx < WIDTH && ny >= 0 && ny < HEIGHT) {
+                if (map[ny][nx] == '#' || map[ny][nx] == '+') {
+                    visible[ny][nx] = true;
+                }
+            }
+        }
+    }
+}
+
+void reveal_room(struct ROOM room) {
+    for (int y = room.y; y < room.y + room.height; y++) {
+        for (int x = room.x; x < room.x + room.width; x++) {
+            visible[y][x] = true;
+        }
+    }
+}
+
+void player_in_room (int px, int py, struct ROOM rooms[], int room_count) {
+    for (int i = 0; i < room_count; i++) {
+        struct ROOM r = rooms[i];
+        if (px >= r.x && px < r.x + r.width &&
+            py >= r.y && py < r.y + r.height) {
+            reveal_room(r);
+        }
+    }
+    reveal_corridor(px, py);
+}
+
+void render_map() {
+    for (int i = 0; i < HEIGHT; i++) {
+        for (int j = 0; j < WIDTH; j++) {
+            if(visible[i][j]) {
+                mvaddch(i, j, map[i][j]);
+            } else {
+                mvaddch(i, j, ' ');
+            }
+        }
+    }
+}
+
+void generate_map (){
+    struct ROOM rooms [ROOM_COUNT];
+    int room_count = 0;
+    
+    init_map();
+    while (room_count < ROOM_COUNT) {
+        struct ROOM new_room;
+        new_room.width = ROOM_MIN_SIZE + rand() % (ROOM_MAX_SIZE - ROOM_MIN_SIZE + 1);
+        new_room.height = ROOM_MIN_SIZE + rand() % (ROOM_MAX_SIZE - ROOM_MIN_SIZE + 1);
+        new_room.x = rand() % (WIDTH - new_room.width - 1);
+        new_room.y = rand() % (HEIGHT - new_room.height - 1);
+        
+        bool overlap = false;
+        
+        for ( int i = 0; i < room_count ; i ++ ){
+            if (room_overlap(new_room, rooms[i])) {
+                overlap = true;
+                break;
+            }
+        }
+        
+        if (!overlap) {
+            add_room(new_room);
+            
+            if (room_count > 0) {
+                corridor (rooms[room_count - 1].x + rooms[room_count - 1].width / 2, rooms[room_count - 1].y + rooms[room_count - 1].height / 2, new_room.x + new_room.width / 2, new_room.y + new_room.height / 2);
+            }
+            rooms[room_count++] = new_room;
+        }
+    }
+    
+    int px = rooms[0].x + 1, py = rooms[0].y + 1;
+    player_in_room(px, py, rooms, room_count);
+    
+    int ch;
+    
+    while (1) {
+        clear();
+        render_map();
+        init_colors();
+        attron(COLOR_PAIR(hero_color));
+        mvaddch(py, px, '@');
+        attroff(COLOR_PAIR(hero_color));
+        refresh();
+        
+        ch = getch();
+        if (ch == 'q') break;
+        int nx = px, ny = py;
+        
+        if (ch == KEY_UP) ny--;
+        else if (ch == KEY_DOWN) ny++;
+        else if (ch == KEY_LEFT) nx--;
+        else if (ch == KEY_RIGHT) nx++;
+        
+        if (map[ny][nx] == '.' || map[ny][nx] == '#' || map[ny][nx] == '+') {
+            px = nx;
+            py = ny;
+            player_in_room(px, py, rooms, room_count);
+        }
+    }
+           
+}
+           
+
 
 void setting_menu (){
     int ch;
@@ -146,6 +345,7 @@ void setting_menu (){
             } else if (choice == 1) { // customize
                 clear();
                 customize_menu();
+                
                 refresh();
             } else if (choice == 2) { //Music
                 clear();
@@ -154,6 +354,7 @@ void setting_menu (){
             } else if (choice == 3) { //Exit
                 clear();
                 refresh();
+                break;
             }
         }
     }
@@ -174,6 +375,9 @@ void start_game_menu () {
         else if (ch == KEY_DOWN && choice < 4) choice++;
         else if (ch == '\n') {
             if (choice == 0) { // New Game
+                init_map();
+                generate_map();
+                //render_map();
                 getch();
                 refresh();
             } else if (choice == 1) {// Prev Game (make the menu later)
@@ -491,7 +695,8 @@ void load_welcome_page () {
 }
 
 int main() {
-
+    setlocale(LC_ALL, "en_US.UTF-8");
+    srand(time(NULL));
     initscr();
     raw();
     keypad(stdscr, TRUE);
@@ -508,3 +713,5 @@ int main() {
     endwin();
     return 0;
 }
+
+
