@@ -3,8 +3,6 @@
 //  rogue (parisa's version)
 //
 //  Created by parisa on 12/22/24.
-
-
 #include <stdio.h>
 #include <curses.h>
 #include <string.h>
@@ -178,7 +176,7 @@ void corridor (int x1, int y1, int x2, int y2) {
     
     if (rand() % 2) {
         while (x1 != x2) {
-            if (!door_placed && ( map[y1][x1] == '|' || map[y1][x1] == '-'))  {
+            if (!door_placed || ( map[y1][x1] == '|' || map[y1][x1] == '-'))  {
                 map[y1][x1] = '+';
                 door_placed = true;
             }  else if ( map[y1][x1] == ' ')  {
@@ -188,7 +186,7 @@ void corridor (int x1, int y1, int x2, int y2) {
         }
         
         while (y1 != y2) {
-            if (!door_placed && ( map[y1][x1] == '|' || map[y1][x1] == '-'))  {
+            if (!door_placed || ( map[y1][x1] == '|' || map[y1][x1] == '-'))  {
                 map[y1][x1] = '+';
                 door_placed = true;
             }  else if ( map[y1][x1] == ' ')  {
@@ -199,7 +197,7 @@ void corridor (int x1, int y1, int x2, int y2) {
     } else {
         
         while (y1 != y2) {
-            if (!door_placed && ( map[y1][x1] == '|' || map[y1][x1] == '-'))  {
+            if (!door_placed || ( map[y1][x1] == '|' || map[y1][x1] == '-'))  {
                 map[y1][x1] = '+';
                 door_placed = true;
             }  else if ( map[y1][x1] == ' ')  {
@@ -209,7 +207,7 @@ void corridor (int x1, int y1, int x2, int y2) {
         }
         
         while (x1 != x2) {
-            if (!door_placed && ( map[y1][x1] == '|' || map[y1][x1] == '-'))  {
+            if (!door_placed || ( map[y1][x1] == '|' || map[y1][x1] == '-'))  {
                 map[y1][x1] = '+';
                 door_placed = true;
             }  else if ( map[y1][x1] == ' ')  {
@@ -221,7 +219,7 @@ void corridor (int x1, int y1, int x2, int y2) {
 }
 
 
-void reveal_corridor (int px, int py) {
+/*void reveal_corridor (int px, int py) {
     
     for (int dy = -CORRIDOR_VISIBLE; dy <= CORRIDOR_VISIBLE; dy++) {
         for (int dx = -CORRIDOR_VISIBLE; dx <= CORRIDOR_VISIBLE; dx++) {
@@ -254,11 +252,12 @@ void player_in_room (int px, int py, struct ROOM rooms[], int room_count) {
     }
     reveal_corridor(px, py);
 }
-
+*/
 void render_map() {
     for (int i = 0; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
-            if(visible[i][j]) {
+            if(1) {
+                //(visible[i][j]) {
                 mvaddch(i, j, map[i][j]);
             } else {
                 mvaddch(i, j, ' ');
@@ -294,14 +293,14 @@ void generate_map (){
             add_room(new_room);
             
             if (room_count > 0) {
-                corridor (rooms[room_count - 1].x + rooms[room_count - 1].width / 2, rooms[room_count - 1].y + rooms[room_count - 1].height / 2, new_room.x + new_room.width / 2, new_room.y + new_room.height / 2);
+                corridor (rooms[room_count - 1].x + (rooms[room_count - 1].width - 1) / 2, rooms[room_count - 1].y + (rooms[room_count - 1].height -1) / 2, new_room.x + (new_room.width  -1)/ 2, new_room.y + (new_room.height -1) / 2);
             }
             rooms[room_count++] = new_room;
         }
     }
     
     int px = rooms[0].x + 1, py = rooms[0].y + 1;
-    player_in_room(px, py, rooms, room_count);
+    //player_in_room(px, py, rooms, room_count);
     
     int ch;
     
@@ -326,7 +325,7 @@ void generate_map (){
         if (map[ny][nx] == '.' || map[ny][nx] == '#' || map[ny][nx] == '+') {
             px = nx;
             py = ny;
-            player_in_room(px, py, rooms, room_count);
+           // player_in_room(px, py, rooms, room_count);
         }
     }
 }
@@ -716,7 +715,7 @@ int main() {
     raw();
     keypad(stdscr, TRUE);
     noecho();
-    
+
     if (has_colors()) {
         init_colors();
     }
@@ -728,5 +727,3 @@ int main() {
     endwin();
     return 0;
 }
-
-
