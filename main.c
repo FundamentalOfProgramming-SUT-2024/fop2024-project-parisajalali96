@@ -3,6 +3,8 @@
 //  rogue (parisa's version)
 //
 //  Created by parisa on 12/22/24.
+
+
 #include <stdio.h>
 #include <curses.h>
 #include <string.h>
@@ -54,6 +56,13 @@ void pick_one (int highlight, char* menu_name, char * options[], int n) {
         }
     }
 
+}
+
+void messages (char * event) {
+    
+    
+    
+    
 }
 
 void difficulty () {
@@ -211,6 +220,7 @@ void corridor (int x1, int y1, int x2, int y2) {
     }
 }
 
+
 void reveal_corridor (int px, int py) {
     
     for (int dy = -CORRIDOR_VISIBLE; dy <= CORRIDOR_VISIBLE; dy++) {
@@ -260,6 +270,8 @@ void render_map() {
 void generate_map (){
     struct ROOM rooms [ROOM_COUNT];
     int room_count = 0;
+    int door_count = 0;
+    int doors[ROOM_COUNT * 4][2];
     
     init_map();
     while (room_count < ROOM_COUNT) {
@@ -317,10 +329,7 @@ void generate_map (){
             player_in_room(px, py, rooms, room_count);
         }
     }
-           
 }
-           
-
 
 void setting_menu (){
     int ch;
@@ -350,7 +359,7 @@ void setting_menu (){
             } else if (choice == 2) { //Music
                 clear();
                 refresh();
-
+                
             } else if (choice == 3) { //Exit
                 clear();
                 refresh();
@@ -518,17 +527,23 @@ void play_menu () {
     int ch;
     int choice = 0;
     char menu_name [50] = {"Play Menu"};
-    char * options [] = { "Login", "Register", "Forgot Password", "Exit"};
+    char * options [] = { "Play as a Guest" ,"Login", "Register", "Forgot Password", "Exit"};
     while (1) {
         clear();
-        pick_one(choice, menu_name, options, 4);
+        pick_one(choice, menu_name, options, 5);
         refresh();
         
         ch = getch();
         if (ch == KEY_UP && choice > 0) choice--;
         else if (ch == KEY_DOWN && choice < 4) choice++;
         else if (ch == '\n') {
-            if (choice == 0) { // Login
+            if (choice == 0) { //guest
+                clear();
+                printw("You are no playing as a guest!\n");
+                printw("Press any key to continue.\n");
+                getch();
+                start_game_menu();
+            } else if (choice == 1) { // Login
                 clear();
                 get_info("Enter username: ", username, 50, 0);
 
@@ -542,7 +557,7 @@ void play_menu () {
                 }
                 refresh();
                 getch();
-            } else if (choice == 1) { // Register
+            } else if (choice == 2) { // Register
                 while (1) {
                     clear();
                     get_info("Enter username: ", username, 50, 0);
@@ -579,13 +594,13 @@ void play_menu () {
                 printw("Registration successful!\n");
                 refresh();
                 getch();
-            } else if ( choice == 2) { // forgot pass
+            } else if ( choice == 3) { // forgot pass
                 get_info("Enter your username: ", username, 50, 0);
                 refresh();
                 printw("Do you pinky promise it's you, %s? :(", username);
                 getch();
                 forgot_pass(username);
-            } else if (choice == 3) { //exit
+            } else if (choice == 4) { //exit
                 clear();
                 refresh();
                 break;
