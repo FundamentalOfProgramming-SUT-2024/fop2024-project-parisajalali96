@@ -18,13 +18,13 @@
 #define ROOM_MAX_SIZE 10
 #define ROOM_COUNT 6
 #define CORRIDOR_VISIBLE 4
+#define MAX_PILLAR 3
+#define LOCKED_PASS_LEN 4
+#define PASS_TIMEOUT 30
+//403170933
 struct ROOM {
     int x, y, height, width;
 };
-
-char map [HEIGHT][WIDTH];
-bool visible[HEIGHT][WIDTH];
-bool visited[HEIGHT][WIDTH];
 
 struct scores {
     char name [50];
@@ -33,11 +33,20 @@ struct scores {
     int total_games;
     time_t lastgame;
 };
+// structs
+
+char map [HEIGHT][WIDTH];
+bool visible[HEIGHT][WIDTH];
+bool visited[HEIGHT][WIDTH];
 
 struct scores ranks [MAX_SIZE];
 int score_count = 0;
 
 int hero_color = 1;
+char password[LOCKED_PASS_LEN + 1];
+time_t password_show_time = 0;
+
+//global stuff
 
 void pick_one (int highlight, char* menu_name, char * options[], int n) {
     attron(COLOR_PAIR(1));
@@ -169,6 +178,72 @@ void add_room (struct ROOM room) {
     }
 }
 
+void door_fix(struct ROOM room) {
+
+    for (int y = room.y; y < room.y + room.height; y++) {
+        if (map[y][room.x] == '+') {
+            if (map[y][room.x - 1] != '#') {
+                map[y][room.x] = '|';
+            }
+        } else {
+            if (map[y][room.x - 1] == '#') {
+                map[y][room.x] = '+';
+            }
+        }
+    }
+
+    for (int y = room.y; y < room.y + room.height; y++) {
+        if (map[y][room.x + room.width - 1] == '+') {
+            if (map[y][room.x + room.width] != '#') {
+                map[y][room.x + room.width - 1] = '|';
+            }
+        } else {
+            if (map[y][room.x + room.width] == '#') {
+                map[y][room.x + room.width - 1] = '+';
+            }
+        }
+    }
+
+    for (int x = room.x; x < room.x + room.width; x++) {
+        if (map[room.y][x] == '+') {
+            if (map[room.y - 1][x] != '#') {
+                map[room.y][x] = '-';
+            }
+        } else {
+            if (map[room.y - 1][x] == '#') {
+                map[room.y][x] = '+';
+            }
+        }
+    }
+
+    for (int x = room.x; x < room.x + room.width; x++) {
+        if (map[room.y + room.height - 1][x] == '+') {
+            if (map[room.y + room.height][x] != '#') {
+                map[room.y + room.height - 1][x] = '-';
+            }
+        } else {
+            if (map[room.y + room.height][x] == '#') {
+                map[room.y + room.height - 1][x] = '+';
+            }
+        }
+    }
+}
+
+void add_pillar (struct ROOM room) {
+    int pillar_count = 0;
+    
+    for (int y = room.y; y < room.y + room.height; y++) {
+        if (pillar_count >= MAX_PILLAR) break;
+        for (int x = room.x; x < room.x + room.width; x++) {
+            if (pillar_count >= MAX_PILLAR) break;
+            if (rand () % 20 == 0 && map[y][x] == '.' && (map[y][x+ 1] != '+' || map[y][x-1] != '+' || map[y+1][x] != '+' || map[y-1][x] != '+')) {
+                map[y][x] = 'O';
+                pillar_count++;
+            }
+        }
+    }
+}
+        
 void corridor (int x1, int y1, int x2, int y2) {
     int start_x = x1;
     int start_y = y1;
@@ -176,9 +251,9 @@ void corridor (int x1, int y1, int x2, int y2) {
     
     if (rand() % 2) {
         while (x1 != x2) {
-            if (!door_placed || ( map[y1][x1] == '|' || map[y1][x1] == '-'))  {
+            if (( map[y1][x1] == '|' || map[y1][x1] == '-'))  {
                 map[y1][x1] = '+';
-                door_placed = true;
+                //door_placed = true;
             }  else if ( map[y1][x1] == ' ')  {
                 map[y1][x1] = '#';
             }
@@ -186,9 +261,9 @@ void corridor (int x1, int y1, int x2, int y2) {
         }
         
         while (y1 != y2) {
-            if (!door_placed || ( map[y1][x1] == '|' || map[y1][x1] == '-'))  {
+            if (( map[y1][x1] == '|' || map[y1][x1] == '-'))  {
                 map[y1][x1] = '+';
-                door_placed = true;
+                //door_placed = true;
             }  else if ( map[y1][x1] == ' ')  {
                 map[y1][x1] = '#';
             }
@@ -218,7 +293,132 @@ void corridor (int x1, int y1, int x2, int y2) {
     }
 }
 
+void generate_pass (char *password) {
+    for (int i = 0; i < LOCKED_PASS_LEN; i++) {
+        password[i] = '0' + rand() % 10;
+    }
+    password[LOCKED_PASS_LEN] = '\0';
+}
 
+void show_password(int px, int py) {
+    
+    if (password_show_time == 0) {
+           generate_pass(password);
+           password_show_time = time(NULL);
+       }
+    
+    int win_width = 20;
+    int win_height = 5;
+    WINDOW *password_win = newwin(win_height, win_width, py - 2, px + 2);
+    
+    //init_colors();
+    wbkgd(password_win, COLOR_PAIR(2));
+    box(password_win, 0, 0);
+    
+    int time_passed = (int)difftime(time(NULL), password_show_time);
+
+    if (time_passed < PASS_TIMEOUT) {
+        mvwprintw(password_win, 2, 1, "SHH! Dont tell anyone!\n");
+        mvwprintw(password_win, 2, 2, "Password: %s", password);
+        wrefresh(password_win);
+       } else {
+           password_show_time = 0;
+           delwin(password_win);
+       }
+}
+
+void lock_pass_input (int px, int py) {
+    
+    char is_pass [4];
+    int win_width = 20;
+    int win_height = 5;
+    WINDOW *password_win = newwin(win_height, win_width, py - 2, px + 2);
+    
+    //init_colors();
+    wbkgd(password_win, COLOR_PAIR(2));
+    box(password_win, 0, 0);
+    
+    echo();
+    mvwprintw(password_win, 2, 1, "Knock Knock! Who's there? The password, please!\n");
+    refresh();
+    scanw("%4s", is_pass);
+    noecho();
+
+    if (strcmp(password, is_pass) == 0) {
+        mvwprintw(password_win, 2, 1, "Aha! The door swings open for you!\n");
+        attron(COLOR_GREEN);
+        map[py][px] = '@';
+        attroff(COLOR_GREEN);
+        delwin(password_win);
+    } else {
+        mvwprintw(password_win, 2, 1, "Wrong password. Nice try, though!\n");
+        delwin(password_win);
+    }
+}
+
+void door_or_hint (int px, int py) {
+    int ch = getch();
+    
+    if ( ch == 'q') return;
+    
+    int new_x = px;
+    int new_y = py;
+    
+    if (ch == KEY_UP) new_y--;
+    else if (ch == KEY_DOWN) new_y++;
+    else if (ch == KEY_LEFT) new_x--;
+    else if (ch == KEY_RIGHT) new_x++;
+
+    if (map[new_y][new_x] == '@') {
+        lock_pass_input(new_x, new_y);
+    } else if (map[new_y][new_x] == '&') {
+        show_password(new_x, new_y);
+    } else {
+        px = new_x;
+        py = new_y;
+    }
+}
+
+void locked_door (struct ROOM room) {
+    int door_side = rand () %4;
+    int door_x = 0, door_y = 0;
+    
+    switch(door_side) {
+        case 0: {
+            door_x = room.x + rand() % room.width;
+            door_y = room.y;
+            break;
+        }
+        case 1: {
+            door_x = room.x + rand() % room.width;
+            door_y = room.y + room.height - 1;
+            break;
+        }
+        case 2: {
+            door_x = room.x;
+            door_y = room.y + rand() % room.height;
+            break;
+        }
+        case 3: {
+            door_x = room.x + room.width - 1;
+            door_y = room.y + rand() % room.height;
+            break;
+        }
+    }
+    attron(COLOR_RED);
+    map[door_y][door_x] = '@';
+    attroff(COLOR_RED);
+    
+    int hint_x, hint_y;
+    do {
+        hint_x = room.x + 1 + rand() % (room.width - 2);
+        hint_y = room.y + 1 + rand() % (room.height - 2);
+    } while (map[hint_y][hint_x] != '.');
+    attron(COLOR_YELLOW);
+    map[hint_y][hint_x] = '&';
+    attroff(COLOR_YELLOW);
+    
+}
 /*void reveal_corridor (int px, int py) {
     
     for (int dy = -CORRIDOR_VISIBLE; dy <= CORRIDOR_VISIBLE; dy++) {
@@ -291,26 +491,31 @@ void generate_map (){
         
         if (!overlap) {
             add_room(new_room);
+            add_pillar(new_room);
             
             if (room_count > 0) {
                 corridor (rooms[room_count - 1].x + (rooms[room_count - 1].width - 1) / 2, rooms[room_count - 1].y + (rooms[room_count - 1].height -1) / 2, new_room.x + (new_room.width  -1)/ 2, new_room.y + (new_room.height -1) / 2);
+                door_fix(new_room);
+               if ( rand () % 6 == 0) locked_door(new_room);
             }
             rooms[room_count++] = new_room;
         }
     }
     
     int px = rooms[0].x + 1, py = rooms[0].y + 1;
-    //player_in_room(px, py, rooms, room_count);
-    
+    //player_in_room(px, py, rooms, room_count);    
     int ch;
     
     while (1) {
+        curs_set(0);
         clear();
         render_map();
         init_colors();
-        attron(COLOR_PAIR(hero_color));
+        if (hero_color == 1) attron(COLOR_WHITE);
+        else attron(COLOR_PAIR(hero_color));
         mvaddch(py, px, '@');
-        attroff(COLOR_PAIR(hero_color));
+        if (hero_color == 1) attroff(COLOR_WHITE);
+        else attroff(COLOR_PAIR(hero_color));
         refresh();
         
         ch = getch();
@@ -328,6 +533,7 @@ void generate_map (){
            // player_in_room(px, py, rooms, room_count);
         }
     }
+    curs_set(1);
 }
 
 void setting_menu (){
