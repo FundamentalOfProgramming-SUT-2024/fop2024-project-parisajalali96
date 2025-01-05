@@ -3,6 +3,8 @@
 //  rogue (parisa's version)
 //
 //  Created by parisa on 12/22/24.
+
+
 #include <stdio.h>
 #include <curses.h>
 #include <string.h>
@@ -19,6 +21,7 @@
 #define ROOM_COUNT 6
 #define CORRIDOR_VISIBLE 4
 #define MAX_PILLAR 3
+#define MAX_TRAP 3
 #define LOCKED_PASS_LEN 4
 #define PASS_TIMEOUT 30
 //403170933
@@ -106,13 +109,13 @@ void difficulty () {
 }
 
 void init_colors() {
-    start_color();
     init_pair(7, COLOR_WHITE, COLOR_BLUE);
     init_pair(2, COLOR_RED, COLOR_BLACK);
     init_pair(3, COLOR_CYAN, COLOR_BLACK);
     init_pair(6, COLOR_MAGENTA, COLOR_BLACK);
     init_pair(4, COLOR_BLUE, COLOR_BLACK);
     init_pair(5, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(8, COLOR_WHITE, COLOR_RED);
 }
 
 void customize_menu () {
@@ -237,12 +240,100 @@ void add_pillar (struct ROOM room) {
         if (pillar_count >= MAX_PILLAR) break;
         for (int x = room.x; x < room.x + room.width; x++) {
             if (pillar_count >= MAX_PILLAR) break;
-            if (rand () % 20 == 0 && map[y][x] == '.' && (map[y][x+ 1] != '+' || map[y][x-1] != '+' || map[y+1][x] != '+' || map[y-1][x] != '+')) {
+            if (rand () % 30 == 0 && map[y][x] == '.' && (map[y][x+ 1] != '+' && map[y][x-1] != '+' && map[y+1][x] != '+' && map[y-1][x] != '+')) {
                 map[y][x] = 'O';
                 pillar_count++;
             }
         }
     }
+}
+
+void add_trap (struct ROOM room) {
+    int trap_count = 0;
+    for (int y = room.y; y < room.y + room.height; y++) {
+        if (trap_count >= MAX_TRAP) break;
+        for (int x = room.x; x < room.x + room.width; x++) {
+            if (trap_count >= MAX_TRAP) break;
+            if (rand () % 30 == 0 && map[y][x] == '.') {
+                map[y][x] = '^';
+                trap_count++;
+            }
+        }
+    }
+}
+
+void add_stairs (struct ROOM room) {
+    bool stairs_placed = false;
+    for (int y = room.y; y < room.y + room.height; y++) {
+        if (stairs_placed) break;
+        for (int x = room.x; x < room.x + room.width; x++) {
+            if (stairs_placed) break;
+            if (rand () % 20 == 0 && map[y][x] == '.') {
+                map[y][x] = '<';
+                stairs_placed = true;
+            }
+        }
+    }
+    
+    if (!stairs_placed) {
+        int center_x = room.x + room.width / 2;
+        int center_y = room.y + room.height / 2;
+        map[center_y][center_x] = '<';
+    }
+}
+
+void add_hidden_door (struct ROOM room ) {
+    int door_side = rand () % 4;
+    int door_x = 0, door_y = 0;
+    
+    switch(door_side) {
+        case 0: {
+            door_x = room.x + rand() % room.width;
+            door_y = room.y;
+            break;
+        }
+        case 1: {
+            door_x = room.x + rand() % room.width;
+            door_y = room.y + room.height - 1;
+            break;
+        }
+        case 2: {
+            door_x = room.x;
+            door_y = room.y + rand() % room.height;
+            break;
+        }
+        case 3: {
+            door_x = room.x + room.width - 1;
+            door_y = room.y + rand() % room.height;
+            break;
+        }
+    }
+    attron(COLOR_PAIR(2));
+    map[door_y][door_x] = '?';
+    attroff(COLOR_PAIR(2));
+    refresh();
+    
+}
+
+void add_master_key (struct ROOM room) {
+    bool key_placed = false;
+    for (int y = room.y; y < room.y + room.height; y++) {
+        if (key_placed) break;
+        for (int x = room.x; x < room.x + room.width; x++) {
+            if (key_placed) break;
+            if (rand () % 20 == 0 && map[y][x] == '.') {
+                map[y][x] = '<';
+                key_placed = true;
+            }
+        }
+    }
+    
+    if (!key_placed) {
+        int center_x = room.x + room.width / 3;
+        int center_y = room.y + room.height / 3;
+        map[center_y][center_x] = '*';
+    }
+    
 }
         
 void corridor (int x1, int y1, int x2, int y2) {
@@ -376,31 +467,23 @@ void lock_pass_input(int px, int py) {
         int msg3_len = strlen(msg3);
         int start_col3 = (win_width - msg3_len) / 2;
         
-       // wclear(password_win);
-        //box(password_win, 0, 0);
         mvwprintw(password_win, 3, start_col3, "%s", msg3);
         wrefresh(password_win);
-        attron(COLOR_GREEN);
-        map[py][px] = '@';
-        attroff(COLOR_GREEN);
-        wrefresh(password_win);
-        wgetch(password_win);
         delwin(password_win);
+        attron(COLOR_PAIR(2));
+        map[py][px] = '@';
+        attroff(COLOR_PAIR(2));
+        refresh();
     } else {
         char msg4 [] = "Wrong password. Nice try, though!";
         int msg4_len = strlen(msg4);
         int start_col4 = (win_width - msg4_len) / 2;
-        //wclear(password_win);
-        //box(password_win, 0, 0);
+        
         mvwprintw(password_win, 3, start_col4, "%s", msg4);
         wrefresh(password_win);
-        wrefresh(password_win);
-        wgetch(password_win);
         delwin(password_win);
     }
 }
-
-
 
 void locked_door (struct ROOM room) {
     int door_side = rand () %4;
@@ -442,6 +525,7 @@ void locked_door (struct ROOM room) {
     attron(COLOR_PAIR(5));
     map[hint_y][hint_x] = '&';
     attroff(COLOR_PAIR(5));
+    refresh();
     
     
 }
@@ -519,16 +603,23 @@ void generate_map (){
         if (!overlap) {
             add_room(new_room);
             add_pillar(new_room);
+            add_trap(new_room);
             
             if (room_count > 0) {
                 corridor (rooms[room_count - 1].x + (rooms[room_count - 1].width - 1) / 2, rooms[room_count - 1].y + (rooms[room_count - 1].height -1) / 2, new_room.x + (new_room.width  -1)/ 2, new_room.y + (new_room.height -1) / 2);
                 door_fix(new_room);
                if ( rand () % 6 == 0) locked_door(new_room);
+                if ( rand () % 6 == 0) add_hidden_door(new_room);
+                
             }
             rooms[room_count++] = new_room;
         }
     }
     
+    int room_with_stairs = rand () %6;
+    int room_with_key = rand () %6;
+    add_stairs(rooms[room_with_stairs]);
+    add_master_key(rooms[room_with_key]);
     int px = rooms[0].x + 1, py = rooms[0].y + 1;
     //player_in_room(px, py, rooms, room_count);    
     int ch;
@@ -554,7 +645,7 @@ void generate_map (){
         else if (ch == KEY_LEFT) nx--;
         else if (ch == KEY_RIGHT) nx++;
         
-        if (map[ny][nx] == '.' || map[ny][nx] == '#' || map[ny][nx] == '+') {
+        if (map[ny][nx] == '.' || map[ny][nx] == '#' || map[ny][nx] == '+' || map[ny][nx] == '^') {
             px = nx;
             py = ny;
            // player_in_room(px, py, rooms, room_count);
@@ -938,17 +1029,50 @@ void main_menu (){
     }
 }
 
-void load_welcome_page () {
+#include <ncurses.h>
+#include <string.h>
+
+void load_welcome_page() {
     clear();
-    printw("Welcome to the Dungeon of Doom!\n");
+    int height = 15, width = 55;
+    int start_y =0;
+    int start_x = 0;
+
+    attron(COLOR_PAIR(2));
+    mvprintw(start_y + 1, start_x + 8, "                           /   \\");
+    mvprintw(start_y + 2, start_x + 8, "_                  )      ((   ))     (");
+    mvprintw(start_y + 3, start_x + 8, "(@)               /|\\      ))_((     /|\\                   _");
+    mvprintw(start_y + 4, start_x + 8, "|-|`\\            / | \\    (/\\|/\\)   / | \\                (@)");
+    mvprintw(start_y + 5, start_x + 8, "| |-------------/--|-voV---\\`|'/--Vov-|--\\--------------|-|");
+    mvprintw(start_y + 6, start_x + 8, "|-|                '^`     (o o)     '^`                  | |");
+    mvprintw(start_y + 7, start_x + 8, "| |                        `\\Y/'                         |-|");
+    mvprintw(start_y + 8, start_x + 8, "|-|                                                       | |");
+    mvprintw(start_y + 9, start_x + 8, "| |                                                       |-|");
+    mvprintw(start_y + 10, start_x + 8,"|_|_______________________________________________________| |");
+    mvprintw(start_y + 11, start_x + 8, "(@)       l   /\\ /         ( (       \\ /\\   l         `\\|-|");
+    mvprintw(start_y + 12, start_x + 8, "         l /   V           \\ \\        V  \\ l            (@)");
+    mvprintw(start_y + 13, start_x + 8, "         l/                _) )_           \\I");
+    mvprintw(start_y + 14, start_x + 8, "                          `\\ /'");
+    mvprintw(start_y + 15, start_x + 8, "                             `");
+    attroff(COLOR_PAIR(2));
+    refresh();
+    
+    attron(COLOR_PAIR(8));
+    char welcome[] = "Welcome to the Dungeon of Doom!";
+    int welcome_len = strlen(welcome);
+    int start = (width - welcome_len) / 2;
+    mvprintw(start_y + 9, 23, "%s", welcome);
+
+    attroff(COLOR_PAIR(8));
     refresh();
     getch();
 }
 
+
 int main() {
+    initscr();
     setlocale(LC_ALL, "en_US.UTF-8");
     srand(time(NULL));
-    initscr();
     raw();
     keypad(stdscr, TRUE);
     noecho();
