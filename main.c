@@ -107,6 +107,7 @@ void difficulty () {
 
 void init_colors() {
     start_color();
+    init_pair(7, COLOR_WHITE, COLOR_BLUE);
     init_pair(2, COLOR_RED, COLOR_BLACK);
     init_pair(3, COLOR_CYAN, COLOR_BLACK);
     init_pair(6, COLOR_MAGENTA, COLOR_BLACK);
@@ -245,8 +246,6 @@ void add_pillar (struct ROOM room) {
 }
         
 void corridor (int x1, int y1, int x2, int y2) {
-    int start_x = x1;
-    int start_y = y1;
     bool door_placed = false;
     
     if (rand() % 2) {
@@ -301,83 +300,107 @@ void generate_pass (char *password) {
 }
 
 void show_password(int px, int py) {
-    
     if (password_show_time == 0) {
-           generate_pass(password);
-           password_show_time = time(NULL);
-       }
-    
-    int win_width = 20;
-    int win_height = 5;
+        generate_pass(password);
+        password_show_time = time(NULL);
+    }
+
+    int win_width = 30;
+    int win_height = 8;
     WINDOW *password_win = newwin(win_height, win_width, py - 2, px + 2);
     
-    //init_colors();
-    wbkgd(password_win, COLOR_PAIR(2));
+    wbkgd(password_win, COLOR_PAIR(7));
     box(password_win, 0, 0);
-    
+
     int time_passed = (int)difftime(time(NULL), password_show_time);
 
-    if (time_passed < PASS_TIMEOUT) {
-        mvwprintw(password_win, 2, 1, "SHH! Dont tell anyone!\n");
-        mvwprintw(password_win, 2, 2, "Password: %s", password);
+    char msg1[] = "SHH! Don't tell anyone!";
+    int msg1_len = strlen(msg1);
+    int start_col1 = (win_width - msg1_len) / 2;
+
+    char msg2[] = "Password: ";
+    int msg2_len = strlen(msg2);
+    int start_col2 = (win_width - msg2_len - strlen(password)) / 2;
+
+    while (time_passed < PASS_TIMEOUT) {
+        mvwprintw(password_win, 3, start_col1, "%s", msg1);
+
+        mvwprintw(password_win, 4, start_col2, "%s%s", msg2, password);
+        
+        time_passed = (int)difftime(time(NULL), password_show_time);
+
+        napms(100);
         wrefresh(password_win);
-       } else {
-           password_show_time = 0;
-           delwin(password_win);
-       }
+    }
+
+    password_show_time = 0;
+    delwin(password_win);
 }
 
-void lock_pass_input (int px, int py) {
-    
-    char is_pass [4];
-    int win_width = 20;
-    int win_height = 5;
+
+
+void lock_pass_input(int px, int py) {
+    char is_pass[5];
+    int win_width = 30;
+    int win_height = 8;
     WINDOW *password_win = newwin(win_height, win_width, py - 2, px + 2);
     
-    //init_colors();
-    wbkgd(password_win, COLOR_PAIR(2));
+    wbkgd(password_win, COLOR_PAIR(7));
     box(password_win, 0, 0);
     
     echo();
-    mvwprintw(password_win, 2, 1, "Knock Knock! Who's there? The password, please!\n");
-    refresh();
-    scanw("%4s", is_pass);
+    char msg1 [] = "Knock Knock! Who's there?";
+    int msg1_len = strlen(msg1);
+    int start_col1 = (win_width - msg1_len) / 2;
+
+    char msg2 [] = "The password, please!: ";
+    int msg2_len = strlen(msg2
+                          );
+    int start_col2 = (win_width - msg2_len) / 2;
+    mvwprintw(password_win, 3, start_col1, "%s", msg1);
+    mvwprintw(password_win, 4, start_col2, "%s", msg2);
+
+    wrefresh(password_win);
+    
+    mvwgetstr(password_win, 5, start_col2, is_pass);
     noecho();
 
+    size_t len = strlen(is_pass);
+    if (len > 0 && is_pass[len - 1] == '\n') {
+        is_pass[len - 1] = '\0';
+    }
+
+
     if (strcmp(password, is_pass) == 0) {
-        mvwprintw(password_win, 2, 1, "Aha! The door swings open for you!\n");
+        char msg3 [] = "Aha! The door swings open for you!";
+        int msg3_len = strlen(msg3);
+        int start_col3 = (win_width - msg3_len) / 2;
+        
+       // wclear(password_win);
+        //box(password_win, 0, 0);
+        mvwprintw(password_win, 3, start_col3, "%s", msg3);
+        wrefresh(password_win);
         attron(COLOR_GREEN);
         map[py][px] = '@';
         attroff(COLOR_GREEN);
+        wrefresh(password_win);
+        wgetch(password_win);
         delwin(password_win);
     } else {
-        mvwprintw(password_win, 2, 1, "Wrong password. Nice try, though!\n");
+        char msg4 [] = "Wrong password. Nice try, though!";
+        int msg4_len = strlen(msg4);
+        int start_col4 = (win_width - msg4_len) / 2;
+        //wclear(password_win);
+        //box(password_win, 0, 0);
+        mvwprintw(password_win, 3, start_col4, "%s", msg4);
+        wrefresh(password_win);
+        wrefresh(password_win);
+        wgetch(password_win);
         delwin(password_win);
     }
 }
 
-void door_or_hint (int px, int py) {
-    int ch = getch();
-    
-    if ( ch == 'q') return;
-    
-    int new_x = px;
-    int new_y = py;
-    
-    if (ch == KEY_UP) new_y--;
-    else if (ch == KEY_DOWN) new_y++;
-    else if (ch == KEY_LEFT) new_x--;
-    else if (ch == KEY_RIGHT) new_x++;
 
-    if (map[new_y][new_x] == '@') {
-        lock_pass_input(new_x, new_y);
-    } else if (map[new_y][new_x] == '&') {
-        show_password(new_x, new_y);
-    } else {
-        px = new_x;
-        py = new_y;
-    }
-}
 
 void locked_door (struct ROOM room) {
     int door_side = rand () %4;
@@ -405,20 +428,24 @@ void locked_door (struct ROOM room) {
             break;
         }
     }
-    attron(COLOR_RED);
+    attron(COLOR_PAIR(2));
     map[door_y][door_x] = '@';
-    attroff(COLOR_RED);
+    attroff(COLOR_PAIR(2));
+    refresh();
     
     int hint_x, hint_y;
     do {
         hint_x = room.x + 1 + rand() % (room.width - 2);
         hint_y = room.y + 1 + rand() % (room.height - 2);
     } while (map[hint_y][hint_x] != '.');
-    attron(COLOR_YELLOW);
+    
+    attron(COLOR_PAIR(5));
     map[hint_y][hint_x] = '&';
-    attroff(COLOR_YELLOW);
+    attroff(COLOR_PAIR(5));
+    
     
 }
+
 /*void reveal_corridor (int px, int py) {
     
     for (int dy = -CORRIDOR_VISIBLE; dy <= CORRIDOR_VISIBLE; dy++) {
@@ -531,6 +558,10 @@ void generate_map (){
             px = nx;
             py = ny;
            // player_in_room(px, py, rooms, room_count);
+        } else if (map[ny][nx] == '@') {
+            lock_pass_input(nx, ny);
+        } else if (map[ny][nx] == '&') {
+            show_password(nx, ny);
         }
     }
     curs_set(1);
@@ -923,6 +954,7 @@ int main() {
     noecho();
 
     if (has_colors()) {
+        start_color();
         init_colors();
     }
     
