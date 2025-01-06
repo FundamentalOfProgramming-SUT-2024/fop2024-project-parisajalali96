@@ -36,12 +36,27 @@ struct scores {
     int total_games;
     time_t lastgame;
 };
+
+struct locked_door {
+    int x, y;
+    int state;
+};
+
+struct secret_door {
+    int x, y;
+    int state;
+};
+
+struct trap {
+    int x, y;
+    int state;
+};
+
 // structs
 
 char map [HEIGHT][WIDTH];
 bool visible[HEIGHT][WIDTH];
 bool visited[HEIGHT][WIDTH];
-bool secret_door_visible[HEIGHT][WIDTH];
 bool trap_visible[HEIGHT][WIDTH];
 
 
@@ -52,7 +67,19 @@ int hero_color = 1;
 char password[LOCKED_PASS_LEN + 1];
 time_t password_show_time = 0;
 
+struct locked_door locked [50];
+int locked_door_count = 0;
+
+struct secret_door hiddens [50];
+int secret_door_count = 0;
+
+struct trap traps [50];
+int traps_count = 0;
+
+int level = 1;
 //global stuff
+
+void generate_map ();
 
 void pick_one (int highlight, char* menu_name, char * options[], int n) {
     attron(COLOR_PAIR(1));
@@ -157,6 +184,9 @@ void customize_menu () {
     }
 }
 
+void cheat_code_M () {
+    
+}
 bool room_overlap (struct ROOM r1, struct ROOM r2) {
     return !(r1.x + r1.width < r2.x || r1.x > r2.x + r2.width || r1.y + r1.height < r2.y || r1.y > r2.y + r2.height);
 }
@@ -252,14 +282,15 @@ void add_pillar (struct ROOM room) {
 }
 
 void add_trap (struct ROOM room) {
-    int trap_count = 0;
     for (int y = room.y; y < room.y + room.height; y++) {
-        if (trap_count >= MAX_TRAP) break;
+        if (traps_count >= MAX_TRAP) break;
         for (int x = room.x; x < room.x + room.width; x++) {
-            if (trap_count >= MAX_TRAP) break;
+            if (traps_count >= MAX_TRAP) break;
             if (rand () % 30 == 0 && map[y][x] == '.') {
-                map[y][x] = '^';
-                trap_count++;
+                traps[traps_count].x = x;
+                traps[traps_count].y = y;
+                traps[traps_count].state = 0;
+                traps_count++;
             }
         }
     }
@@ -285,35 +316,51 @@ void add_stairs (struct ROOM room) {
     }
 }
 
-void show_trap (int ny, int nx) {
-    if(trap_visible[ny][nx]) {
-        map[ny][nx] = '^';
-    } else map [ny][nx] = '.';
-}
-
 void reveal_door (int ny, int nx) {
-    secret_door_visible[ny][nx] = false;
-    if (map[ny][nx] == '?') secret_door_visible[ny][nx] = true;
+    int which_door = 0;
+    for ( int i = 0; i < secret_door_count; i ++) {
+        if(hiddens[i].x == nx && hiddens[i].y == ny) {
+            which_door = i;
+            hiddens[i].state = 1;
+        }
+    }
+    if (hiddens[which_door].state) {
+        attron(COLOR_PAIR(2));
+        map[ny][nx] = '?';
+        attroff(COLOR_PAIR(2));
+        refresh();
+    }
 }
 
 void reveal_trap (int ny, int nx) {
-    trap_visible[ny][nx] = false;
-    if (map[ny][nx] == '^') trap_visible[ny][nx] = true;
-    show_trap(ny, nx);
-
+    int which_trap = 0;
+    for ( int i = 0; i < traps_count; i ++) {
+        if(traps[i].x == nx && traps[i].y == ny) {
+            which_trap = i;
+            traps[i].state = 1;
+        }
+    }
+    
+    if (traps[which_trap].state) {
+        attron(COLOR_PAIR(2));
+        map[ny][nx] = '^';
+        attroff(COLOR_PAIR(2));
+        refresh();
+    }
+    
 }
 
 void add_hidden_door (struct ROOM room ) {
-    int door_x [100], door_y [100];
-    int door_count = 0;
+
     
     for (int y = room.y; y < room.y + room.height; y++) {
         if (map[y][room.x] == '+') {
-            door_x[door_count] = room.x;
-            door_y[door_count] = y;
-            door_count++;
+            hiddens[secret_door_count].x = room.x;
+            hiddens[secret_door_count].y = y;
+            hiddens[secret_door_count].state = 0;
+            secret_door_count++;
             attron(COLOR_PAIR(5));
-            map[y][room.x] = '?';
+            map[y][room.x] = '|';
             attroff(COLOR_PAIR(5));
             refresh();
         }
@@ -321,11 +368,12 @@ void add_hidden_door (struct ROOM room ) {
     
     for (int y = room.y; y < room.y + room.height; y++) {
         if (map[y][room.x + room.width - 1] == '+') {
-            door_x[door_count] = room.x + room.width - 1;
-            door_y[door_count] = y;
-            door_count++;
+            hiddens[secret_door_count].x= room.x + room.width - 1;
+            hiddens[secret_door_count].y = y;
+            hiddens[secret_door_count].state = 0;
+            secret_door_count++;
             attron(COLOR_PAIR(5));
-            map[y][room.x + room.width - 1] = '?';
+            map[y][room.x + room.width - 1] = '|';
             attroff(COLOR_PAIR(5));
             refresh();
         }
@@ -333,11 +381,12 @@ void add_hidden_door (struct ROOM room ) {
     
     for (int x = room.x; x < room.x + room.width; x++) {
         if (map[room.y][x] == '+') {
-            door_x[door_count] = x;
-            door_y[door_count] = room.y;
-            door_count++;
+            hiddens[secret_door_count].x= x;
+            hiddens[secret_door_count].y= room.y;
+            hiddens[secret_door_count].state = 0;
+            secret_door_count++;
             attron(COLOR_PAIR(5));
-            map[room.y][x] = '?';
+            map[room.y][x] = '-';
             attroff(COLOR_PAIR(5));
             refresh();
         }
@@ -345,11 +394,12 @@ void add_hidden_door (struct ROOM room ) {
         
         for (int x = room.x; x < room.x + room.width; x++) {
             if (map[room.y + room.height - 1][x] == '+') {
-                door_x[door_count] = x;
-                door_y[door_count] = room.y + room.height - 1;
-                door_count++;
+                hiddens[secret_door_count].x= x;
+                hiddens[secret_door_count].y= room.y + room.height - 1;
+                hiddens[secret_door_count].state = 0;
+                secret_door_count++;
                 attron(COLOR_PAIR(5));
-                map[room.y + room.height - 1][x] = '?';
+                map[room.y + room.height - 1][x] = '-';
                 attroff(COLOR_PAIR(5));
                 refresh();
             }
@@ -365,7 +415,7 @@ void add_master_key (struct ROOM room) {
         for (int x = room.x; x < room.x + room.width; x++) {
             if (key_placed) break;
             if (rand () % 20 == 0 && map[y][x] == '.') {
-                map[y][x] = '<';
+                map[y][x] = '*';
                 key_placed = true;
             }
         }
@@ -473,7 +523,14 @@ void show_password(int px, int py) {
 
 
 
-void lock_pass_input(int px, int py) {
+int lock_pass_input(int px, int py) {
+    int which_door = 0;
+    for (int c = 0; c < locked_door_count; c ++ ) {
+        if (locked[c].x == px && locked[c].y == py) {
+            which_door = c;
+        }
+    }
+    
     char is_pass[5];
     int win_width = 30;
     int win_height = 8;
@@ -506,6 +563,7 @@ void lock_pass_input(int px, int py) {
 
 
     if (strcmp(password, is_pass) == 0) {
+        locked[which_door].state = 1;
         char msg3 [] = "Aha! The door swings open for you!";
         int msg3_len = strlen(msg3);
         int start_col3 = (win_width - msg3_len) / 2;
@@ -526,17 +584,17 @@ void lock_pass_input(int px, int py) {
         wrefresh(password_win);
         delwin(password_win);
     }
+    return which_door;
 }
 
 void locked_door (struct ROOM room) {
     int door_x [100], door_y [100];
-    int door_count = 0;
-    
     for (int y = room.y; y < room.y + room.height; y++) {
         if (map[y][room.x] == '+' || map[y][room.x] == '?') {
-            door_x[door_count] = room.x;
-            door_y[door_count] = y;
-            door_count++;
+            locked[locked_door_count].x = room.x;
+            locked[locked_door_count].y = y;
+            locked[locked_door_count].state = 0;
+            locked_door_count++;
             attron(COLOR_PAIR(2));
             map[y][room.x] = '@';
             attroff(COLOR_PAIR(2));
@@ -546,9 +604,10 @@ void locked_door (struct ROOM room) {
     
     for (int y = room.y; y < room.y + room.height; y++) {
         if (map[y][room.x + room.width - 1] == '+' || map[y][room.x + room.width - 1] == '?') {
-            door_x[door_count] = room.x + room.width - 1;
-            door_y[door_count] = y;
-            door_count++;
+            locked[locked_door_count].x  = room.x + room.width - 1;
+            locked[locked_door_count].y = y;
+            locked[locked_door_count].state = 0;
+            locked_door_count++;
             attron(COLOR_PAIR(2));
             map[y][room.x + room.width - 1] = '@';
             attroff(COLOR_PAIR(2));
@@ -558,9 +617,10 @@ void locked_door (struct ROOM room) {
     
     for (int x = room.x; x < room.x + room.width; x++) {
         if (map[room.y][x] == '+' || map[room.y][x] == '?') {
-            door_x[door_count] = x;
-            door_y[door_count] = room.y;
-            door_count++;
+            locked[locked_door_count].x = x;
+            locked[locked_door_count].y = room.y;
+            locked[locked_door_count].state = 0;
+            locked_door_count++;
             attron(COLOR_PAIR(2));
             map[room.y][x] = '@';
             attroff(COLOR_PAIR(2));
@@ -570,9 +630,10 @@ void locked_door (struct ROOM room) {
     
     for (int x = room.x; x < room.x + room.width; x++) {
         if (map[room.y + room.height - 1][x] == '+' || map[room.y + room.height - 1][x] == '?') {
-            door_x[door_count] = x;
-            door_y[door_count] = room.y + room.height - 1;
-            door_count++;
+            locked[locked_door_count].x  = x;
+            locked[locked_door_count].y = room.y + room.height - 1;
+            locked[locked_door_count].state = 0;
+            locked_door_count++;
             attron(COLOR_PAIR(2));
             map[room.y + room.height - 1][x] = '@';
             attroff(COLOR_PAIR(2));
@@ -595,7 +656,7 @@ void locked_door (struct ROOM room) {
     
 }
 
-/*void reveal_corridor (int px, int py) {
+void reveal_corridor (int px, int py) {
     
     for (int dy = -CORRIDOR_VISIBLE; dy <= CORRIDOR_VISIBLE; dy++) {
         for (int dx = -CORRIDOR_VISIBLE; dx <= CORRIDOR_VISIBLE; dx++) {
@@ -628,12 +689,11 @@ void player_in_room (int px, int py, struct ROOM rooms[], int room_count) {
     }
     reveal_corridor(px, py);
 }
-*/
+
 void render_map() {
     for (int i = 0; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
-            if(1) {
-                //(visible[i][j]) {
+            if(visible[i][j]) {
                 mvaddch(i, j, map[i][j]);
             } else {
                 mvaddch(i, j, ' ');
@@ -642,11 +702,20 @@ void render_map() {
     }
 }
 
+void new_level () {
+    init_map();
+    generate_map();
+    level++;
+}
+
+void stair_activated (char stair) {
+    if ( stair == '<') {
+        new_level();
+    }
+}
 void generate_map (){
     struct ROOM rooms [ROOM_COUNT];
     int room_count = 0;
-    int door_count = 0;
-    int doors[ROOM_COUNT * 4][2];
     
     init_map();
     while (room_count < ROOM_COUNT) {
@@ -688,8 +757,7 @@ void generate_map (){
     add_master_key(rooms[room_with_key]);
     if (rand() % 4 == 0) locked_door(rooms[0]);
     int px = rooms[0].x + 1, py = rooms[0].y + 1;
-    //player_in_room(px, py, rooms, room_count);
-    //reveal_trap(py, px);
+    player_in_room(px, py, rooms, room_count);
     
     int ch;
     
@@ -714,19 +782,40 @@ void generate_map (){
         else if (ch == KEY_LEFT) nx--;
         else if (ch == KEY_RIGHT) nx++;
         
-        if (map[ny][nx] == '.' || map[ny][nx] == '#' || map[ny][nx] == '+' || map[ny][nx] == '^' || map[ny][nx] == '?') {
+        if ( map[ny][nx] == '#' || map[ny][nx] == '+' || map[ny][nx] == '^' || map[ny][nx] == '?') {
             px = nx;
             py = ny;
-           // player_in_room(px, py, rooms, room_count);
-            //reveal_trap(py, px);
-        } else if (map[ny][nx] == '@') {
-            lock_pass_input(nx, ny);
+            player_in_room(px, py, rooms, room_count);
+        } else if (map[ny][nx] == '<') {
+            char enter = getch();
+            stair_activated(enter);
+            px = nx;
+            py = ny;
+        }
+        else if (map[ny][nx] == '@') {
+            int which_door = lock_pass_input(nx, ny);
+            if (locked[which_door].state) {
+                px = nx;
+                py = ny;
+            }
         } else if (map[ny][nx] == '&') {
             show_password(nx, ny);
+        } else if(map[ny][nx] == '|' || map[ny][nx] == '-') {
+            reveal_door(ny, nx);
+        } else if (map[ny][nx] == '.') {
+            
+            for ( int i = 0; i < traps_count; i ++) {
+                if(traps[i].x == nx && traps[i].y == ny) {
+                    reveal_trap(ny, nx);
+                }
+            }
+            px = nx;
+            py = ny;
         }
     }
     curs_set(1);
 }
+
 
 void setting_menu (){
     int ch;
