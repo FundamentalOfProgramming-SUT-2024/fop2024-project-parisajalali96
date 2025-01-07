@@ -19,7 +19,7 @@
 #define ROOM_MIN_SIZE 4
 #define ROOM_MAX_SIZE 10
 #define ROOM_COUNT 6
-#define CORRIDOR_VISIBLE 4
+#define CORRIDOR_VISIBLE 1
 #define MAX_PILLAR 3
 #define MAX_TRAP 3
 #define LOCKED_PASS_LEN 4
@@ -98,12 +98,11 @@ void pick_one (int highlight, char* menu_name, char * options[], int n) {
 
 }
 
-void messages (char * event) {
-    
-    
-    
+
+void messages () {
     
 }
+
 
 void difficulty () {
     int ch;
@@ -139,6 +138,7 @@ void difficulty () {
 }
 
 void init_colors() {
+    init_pair(9, COLOR_GREEN, COLOR_BLACK);
     init_pair(7, COLOR_WHITE, COLOR_BLUE);
     init_pair(2, COLOR_RED, COLOR_BLACK);
     init_pair(3, COLOR_CYAN, COLOR_BLACK);
@@ -303,8 +303,12 @@ void add_stairs (struct ROOM room) {
         for (int x = room.x; x < room.x + room.width; x++) {
             if (stairs_placed) return;
             if (rand () % 20 == 0 && map[y][x] == '.') {
+                attron(COLOR_PAIR(9));
                 map[y][x] = '<';
+                attroff(COLOR_PAIR(9));
                 stairs_placed = true;
+                refresh();
+
             }
         }
     }
@@ -598,7 +602,7 @@ void locked_door (struct ROOM room) {
             attron(COLOR_PAIR(2));
             map[y][room.x] = '@';
             attroff(COLOR_PAIR(2));
-            refresh();
+           // refresh();
         }
     }
     
@@ -611,7 +615,7 @@ void locked_door (struct ROOM room) {
             attron(COLOR_PAIR(2));
             map[y][room.x + room.width - 1] = '@';
             attroff(COLOR_PAIR(2));
-            refresh();
+            //refresh();
         }
     }
     
@@ -624,7 +628,7 @@ void locked_door (struct ROOM room) {
             attron(COLOR_PAIR(2));
             map[room.y][x] = '@';
             attroff(COLOR_PAIR(2));
-            refresh();
+            //refresh();
         }
     }
     
@@ -637,7 +641,7 @@ void locked_door (struct ROOM room) {
             attron(COLOR_PAIR(2));
             map[room.y + room.height - 1][x] = '@';
             attroff(COLOR_PAIR(2));
-            refresh();
+            //refresh();
         }
     }
 
