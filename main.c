@@ -103,7 +103,7 @@ void pick_one (int highlight, char* menu_name, char * options[], int n) {
 
 
 void messages(char *what_happened) {
-    clear();
+    //clear();
     move(0, 0);
 
     if (strcmp(what_happened, "key broke") == 0) {
@@ -116,9 +116,14 @@ void messages(char *what_happened) {
         attron(COLOR_PAIR(5));
         printw("You picked up a Master Key!\n");
         attroff(COLOR_PAIR(5));
+    } else if (strcmp(what_happened, "cheat code M") == 0) {
+        attron(COLOR_PAIR(5));
+        printw("You have entered full map mode. Press any key to continue.\n");
+        attroff(COLOR_PAIR(5));
     }
 
     refresh();
+    getch();
 }
 
 
@@ -204,7 +209,15 @@ void customize_menu () {
 }
 
 void cheat_code_M () {
-    
+    for ( int j = 0; j < HEIGHT; j ++) {
+        for ( int i = 0; i < WIDTH; i ++) {
+            mvaddch(j, i, map[j][i]);
+        }
+    }
+    refresh();
+    messages("cheat code M");
+    getch();
+
 }
 
 bool room_overlap (struct ROOM r1, struct ROOM r2) {
@@ -739,6 +752,10 @@ void stair_activated (char stair) {
         new_level();
     }
 }
+
+void movement (char ch, int * ny, int * nx) {
+    
+}
 void generate_map (){
     struct ROOM rooms [ROOM_COUNT];
     int room_count = 0;
@@ -803,10 +820,33 @@ void generate_map (){
         if (ch == 'q') break;
         int nx = px, ny = py;
         
-        if (ch == KEY_UP) ny--;
-        else if (ch == KEY_DOWN) ny++;
-        else if (ch == KEY_LEFT) nx--;
-        else if (ch == KEY_RIGHT) nx++;
+        if (ch == KEY_UP || ch == 'J') ny--;
+        else if (ch == KEY_DOWN || ch == 'K') ny++;
+        else if (ch == KEY_LEFT || ch == 'H') nx--;
+        else if (ch == KEY_RIGHT || ch == 'L') nx++;
+        else if (ch == 'Y') {
+            nx--;
+            ny--;
+        }
+        else if (ch =='U') {
+            ny--;
+            nx++;
+        } else if (ch =='B') {
+            ny++;
+            nx--;
+        } else if (ch =='N') {
+            nx++;
+            ny++;
+        }
+        else if (ch == 'M') {
+            cheat_code_M();
+        }
+        else if (ch == 'f') {
+            
+            while (map[ny][nx] == '.') {
+                
+            }
+        }
         
         if ( map[ny][nx] == '#' || map[ny][nx] == '+' || map[ny][nx] == '^' || map[ny][nx] == '?') {
             px = nx;
@@ -855,15 +895,17 @@ void generate_map (){
         } else if (map[ny][nx] == '&') {
             show_password(nx, ny);
         } else if (map[ny][nx] == '*') {
-           messages("master key found");
-           // int break_prob = rand() % 10;
-            if (1) {
+            int break_prob = rand() % 10;
+            if (break_prob == 0) {
                 master_keys_broken [level] = true;
                 
             }
             px = nx;
             py = ny;
             
+            if (first_key[level]) {
+                messages("master key found");
+            }
             if (first_key[level]) {
                 master_key[level] = true;
                 first_key[level] = false;
