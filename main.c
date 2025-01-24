@@ -226,6 +226,7 @@ void init_map () {
     for ( int i = 0; i < HEIGHT; i ++) {
         for (int j = 0; j < WIDTH; j ++) {
             map[i][j] = ' ';
+            //hi
             visible[i][j] = false;
         }
     }
