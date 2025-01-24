@@ -103,8 +103,14 @@ void pick_one (int highlight, char* menu_name, char * options[], int n) {
 
 
 void messages(char *what_happened) {
+<<<<<<< HEAD
     clear();
     move(0, 0);
+=======
+    // Clear the line before printing the new message
+    clear();              // Clears the screen or use clrtoeol() for just clearing the line
+    move(0, 0);           // Move cursor to the top-left corner (optional, if needed)
+>>>>>>> f0f8c50369979602cfd3c7219a107046445344f8
 
     if (strcmp(what_happened, "key broke") == 0) {
         printw("The Master Key breaks.\n");
@@ -118,7 +124,11 @@ void messages(char *what_happened) {
         attroff(COLOR_PAIR(5));
     }
 
+<<<<<<< HEAD
     refresh(); 
+=======
+    refresh();  // Refresh the screen to show the updated message
+>>>>>>> f0f8c50369979602cfd3c7219a107046445344f8
 }
 
 
@@ -821,6 +831,7 @@ void generate_map (){
         else if (map[ny][nx] == '@') {
             bool master = false;
             if (master_key[level] && master_keys_broken[level] == false) {
+<<<<<<< HEAD
                 px = nx;
                 py = ny;
                 master_key[level] = false;
@@ -845,6 +856,32 @@ void generate_map (){
             if (master) {
                 px = nx;
                 py = ny;
+=======
+                px = nx;
+                py = ny;
+                master_key[level] = false;
+                master = true;
+            } else {
+                if (master_keys_broken[level] == true) {
+                    messages("key broke");
+                    for ( int i = 0; i < level; i ++) {
+                        if (master_keys_broken[i]) {
+                            messages("fix key");
+                            char forge = getch();
+                            if (forge == 'y') {
+                                master_keys_broken[level] = false;
+                                messages("key fixed");
+                                master = true;
+                            }
+                        }
+                    }
+                    
+                }
+            }
+            if (master) {
+                px = nx;
+                py = ny;
+>>>>>>> f0f8c50369979602cfd3c7219a107046445344f8
             } else {
                 int which_door = lock_pass_input(nx, ny);
                 if (locked[which_door].state) {
