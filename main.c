@@ -77,6 +77,9 @@ struct trap traps [50];
 int traps_count = 0;
 
 int level = 1;
+bool master_key [5] = {false};
+bool first_key [5] = {true};
+bool master_keys_broken [5] = {false};
 //global stuff
 
 void generate_map ();
@@ -99,9 +102,26 @@ void pick_one (int highlight, char* menu_name, char * options[], int n) {
 }
 
 
-void messages () {
-    
+void messages(char *what_happened) {
+    // Clear the line before printing the new message
+    clear();              // Clears the screen or use clrtoeol() for just clearing the line
+    move(0, 0);           // Move cursor to the top-left corner (optional, if needed)
+
+    if (strcmp(what_happened, "key broke") == 0) {
+        printw("The Master Key breaks.\n");
+    } else if (strcmp(what_happened, "fix key") == 0) {
+        printw("Would you like to mend two broken Master Keys to enter? (y/n)\n");
+    } else if (strcmp(what_happened, "key fixed") == 0) {
+        printw("Two Master Keys have been mended. You can enter.\n");
+    } else if (strcmp(what_happened, "master key found") == 0) {
+        attron(COLOR_PAIR(5));
+        printw("You picked up a Master Key!\n");
+        attroff(COLOR_PAIR(5));
+    }
+
+    refresh();  // Refresh the screen to show the updated message
 }
+
 
 
 void difficulty () {
@@ -187,6 +207,7 @@ void customize_menu () {
 void cheat_code_M () {
     
 }
+
 bool room_overlap (struct ROOM r1, struct ROOM r2) {
     return !(r1.x + r1.width < r2.x || r1.x > r2.x + r2.width || r1.y + r1.height < r2.y || r1.y > r2.y + r2.height);
 }
@@ -421,6 +442,7 @@ void add_master_key (struct ROOM room) {
             if (rand () % 20 == 0 && map[y][x] == '.') {
                 map[y][x] = '*';
                 key_placed = true;
+                
             }
         }
     }
@@ -566,7 +588,7 @@ int lock_pass_input(int px, int py) {
     }
 
 
-    if (strcmp(password, is_pass) == 0) {
+    if (strcmp(password, is_pass) == 0 ) {
         locked[which_door].state = 1;
         char msg3 [] = "Aha! The door swings open for you!";
         int msg3_len = strlen(msg3);
@@ -576,6 +598,7 @@ int lock_pass_input(int px, int py) {
         wrefresh(password_win);
         delwin(password_win);
         attron(COLOR_PAIR(2));
+        mvaddch(py, px, '@');
         map[py][px] = '@';
         attroff(COLOR_PAIR(2));
         refresh();
@@ -797,13 +820,55 @@ void generate_map (){
             py = ny;
         }
         else if (map[ny][nx] == '@') {
-            int which_door = lock_pass_input(nx, ny);
-            if (locked[which_door].state) {
+            bool master = false;
+            if (master_key[level] && master_keys_broken[level] == false) {
                 px = nx;
                 py = ny;
+                master_key[level] = false;
+                master = true;
+            } else {
+                if (master_keys_broken[level] == true) {
+                    messages("key broke");
+                    for ( int i = 0; i < level; i ++) {
+                        if (master_keys_broken[i]) {
+                            messages("fix key");
+                            char forge = getch();
+                            if (forge == 'y') {
+                                master_keys_broken[level] = false;
+                                messages("key fixed");
+                                master = true;
+                            }
+                        }
+                    }
+                    
+                }
+            }
+            if (master) {
+                px = nx;
+                py = ny;
+            } else {
+                int which_door = lock_pass_input(nx, ny);
+                if (locked[which_door].state) {
+                    px = nx;
+                    py = ny;
+                }
             }
         } else if (map[ny][nx] == '&') {
             show_password(nx, ny);
+        } else if (map[ny][nx] == '*') {
+           messages("master key found");
+           // int break_prob = rand() % 10;
+            if (1) {
+                master_keys_broken [level] = true;
+                
+            }
+            px = nx;
+            py = ny;
+            
+            if (first_key[level]) {
+                master_key[level] = true;
+                first_key[level] = false;
+            }
         } else if(map[ny][nx] == '|' || map[ny][nx] == '-') {
             reveal_door(ny, nx);
         } else if (map[ny][nx] == '.') {
