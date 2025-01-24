@@ -102,7 +102,7 @@ void pick_one (int highlight, char* menu_name, char * options[], int n) {
 }
 
 
-void messages(char *what_happened) {
+void messages(char *what_happened, int maybe) {
     //clear();
     move(0, 0);
 
@@ -120,6 +120,14 @@ void messages(char *what_happened) {
         attron(COLOR_PAIR(5));
         printw("You have entered full map mode. Press any key to continue.\n");
         attroff(COLOR_PAIR(5));
+    } else if (strcmp(what_happened, "trap around") == 0) {
+        attron(COLOR_PAIR(8));
+        printw("There are %d traps around you.\n", maybe);
+        attroff(COLOR_PAIR(8));
+    } else if (strcmp(what_happened, "secret door around") == 0) {
+        attron(COLOR_PAIR(8));
+        printw("There are %d secret doors around you.\n", maybe);
+        attroff(COLOR_PAIR(8));
     }
 
     refresh();
@@ -215,9 +223,33 @@ void cheat_code_M () {
         }
     }
     refresh();
-    messages("cheat code M");
+    messages("cheat code M", 0);
     getch();
 
+}
+
+void cheat_code_s (int ny, int nx) {
+    bool trap = false;
+    int trap_num = 0;
+    bool secret_door = false;
+    int door_num = 0;
+    for ( int j = ny -1; j <= ny + 1; j ++) {
+        for ( int i = nx -1; i <= nx + 1; i ++ ) {
+            if (i!= nx || j!= ny) {
+                if (map[j][i] == '?') {
+                    secret_door = true;
+                    door_num ++;
+                }
+                else if (map[j][i] == '^') {
+                    trap = true;
+                    trap_num++;
+                }
+            }
+        }
+    }
+    
+    if (trap) messages("trap around", trap_num);
+    if (secret_door) messages("secret door around", door_num);
 }
 
 bool room_overlap (struct ROOM r1, struct ROOM r2) {
@@ -748,7 +780,7 @@ void new_level () {
 }
 
 void stair_activated (char stair) {
-    if ( stair == '<') {
+    if ( stair == '>') {
         new_level();
     }
 }
@@ -841,10 +873,37 @@ void generate_map (){
         else if (ch == 'M') {
             cheat_code_M();
         }
+        else if (ch == 's') {
+            cheat_code_s(ny, nx);
+        }
         else if (ch == 'f') {
+            int condition [2] = {0};
+            int direction = getch();
+            if (direction == KEY_UP || direction == 'J') condition[0] =-1;
+            else if (direction == KEY_DOWN || direction == 'K') condition[0]=1;
+            else if (direction == KEY_LEFT || direction == 'H') condition[1]=-1;
+            else if (direction == KEY_RIGHT || direction == 'L') condition[1]=1;
+            else if (direction =='Y') {
+                condition[0] = -1;
+                condition[1] = -1;
+            } else if (direction =='U') {
+                condition[0] = -1;
+                condition[1] = 1;
+            }  else if (direction =='B') {
+                condition[0] = 1;
+                condition[1] = -1;
+            }  else if (direction =='N') {
+                condition[0] = 1;
+                condition[1] = 1;
+            }
             
             while (map[ny][nx] == '.') {
-                
+                nx +=condition[1];
+                ny += condition[0];
+                if (map[ny][nx] == '.') {
+                    px = nx;
+                    py = ny;
+                }
             }
         }
         
@@ -867,14 +926,14 @@ void generate_map (){
                 master = true;
             } else {
                 if (master_keys_broken[level] == true) {
-                    messages("key broke");
+                    messages("key broke", 0);
                     for ( int i = 0; i < level; i ++) {
                         if (master_keys_broken[i]) {
-                            messages("fix key");
+                            messages("fix key", 0);
                             char forge = getch();
                             if (forge == 'y') {
                                 master_keys_broken[level] = false;
-                                messages("key fixed");
+                                messages("key fixed", 0);
                                 master = true;
                             }
                         }
@@ -904,7 +963,7 @@ void generate_map (){
             py = ny;
             
             if (first_key[level]) {
-                messages("master key found");
+                messages("master key found", 0);
             }
             if (first_key[level]) {
                 master_key[level] = true;
