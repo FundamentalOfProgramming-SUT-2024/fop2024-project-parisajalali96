@@ -22,6 +22,7 @@
 #define CORRIDOR_VISIBLE 1
 #define MAX_PILLAR 3
 #define MAX_TRAP 3
+#define MAX_FOOD 3
 #define LOCKED_PASS_LEN 4
 #define PASS_TIMEOUT 30
 
@@ -895,10 +896,10 @@ void stair_activated (char stair) {
 
 char * food_name (int color) {
     char * name [] = {"Ambrosia", "Slightly Moldy Cheese", "Rock-hard Biscuit", "Questionable Apple", "Mystery Meat", "Infernal Steak", "Ethereal Berries", "Exploding Berries", "Potionberry Pie"};
-    if (color == 0) {
+    if (color == 5) {
         int which = rand () % 3;
         return name[which];
-    } else if (color == 1) {
+    } else if (color == 2) {
         int which = 3 + rand () % 3;
         return name[which];
     } else {
@@ -910,11 +911,18 @@ char * food_name (int color) {
 
 void add_food (struct ROOM room) {
     for (int y = room.y; y < room.y + room.height; y++) {
-        if (food_count >= MAX_TRAP) break;
+        if (food_count >= MAX_FOOD) break;
         for (int x = room.x; x < room.x + room.width; x++) {
-            if (food_count >= MAX_TRAP) break;
+            if (food_count >= MAX_FOOD) break;
             if (rand () % 20 == 0 && map[y][x] == '.') {
                 int color = rand() % 3;
+                if (color == 0) {
+                    color = 5;
+                } else if (color == 1) {
+                    color = 2;
+                } else {
+                    color = 6;
+                }
                 foods[food_count].color = color;
                 map[y][x] = '%';
                 foods[food_count].x = x;
