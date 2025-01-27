@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <locale.h>
 
-
 #define MAX_SIZE 100
 #define HEIGHT 25
 #define WIDTH 50
@@ -25,7 +24,9 @@
 #define MAX_FOOD 3
 #define LOCKED_PASS_LEN 4
 #define PASS_TIMEOUT 30
-
+#define MAX_HEALTH 100
+#define HEALTH_R 1
+#define HEALTH_TIME 5000000
 //403170933
 struct ROOM {
     int x, y, height, width;
@@ -102,11 +103,13 @@ int food_count = 0;
 
 struct picked_up pocket [100];
 int pocket_count;
+
+time_t last_health_update = 0;
 //global stuff
 
 void generate_map ();
 int determine_color(char, int, int);
-
+void show_level();
 //prototypes
 void pick_one (int highlight, char* menu_name, char * options[], int n) {
     attron(COLOR_PAIR(1));
@@ -886,6 +889,7 @@ void new_level () {
     init_map();
     generate_map();
     level++;
+    show_level();
 }
 
 void stair_activated (char stair) {
@@ -908,6 +912,50 @@ char * food_name (int color) {
     }
 }
 
+void health_update () {
+    time_t current_time;
+    time(&current_time);
+
+    if (difftime(current_time, last_health_update) >= HEALTH_TIME) {
+        health -= HEALTH_R;
+        
+        if (health < 0) {
+            health = 0;
+        }
+        last_health_update = current_time;
+    }
+}
+    
+void show_level () {
+    attron(COLOR_PAIR(5));
+    mvprintw(LINES - 1, 0, "Level: %d", level);
+    attroff(COLOR_PAIR(5));
+    refresh();
+}
+void health_bar (int health) {
+    int filled = (health * 20) / MAX_HEALTH;
+    move(LINES - 1, COLS - 20 - 10);
+    addch('[');
+    for (int i = 0; i < 20; i++) {
+        if (i < filled) {
+            attron(COLOR_PAIR(9));
+            addch('#');
+            attroff(COLOR_PAIR(9));
+            refresh();
+            
+        } else {
+            attron(COLOR_PAIR(9));
+            addch('-');
+            attroff(COLOR_PAIR(9));
+            refresh();
+        }
+    }
+    addch(']');
+
+    mvprintw(LINES - 1, COLS - 20 - 10 + 20 + 2, "%d%%", (health * 100) / MAX_HEALTH);
+    refresh();
+
+}
 
 void add_food (struct ROOM room) {
     for (int y = room.y; y < room.y + room.height; y++) {
@@ -935,6 +983,7 @@ void add_food (struct ROOM room) {
 }
 
 void generate_map (){
+    show_level();
     struct ROOM rooms [ROOM_COUNT];
     int room_count = 0;
     
@@ -985,7 +1034,9 @@ void generate_map (){
     
     while (1) {
         curs_set(0);
-        clear();
+        //clear();
+        refresh();
+        health_bar(health);
         render_map();
         init_colors();
         if (hero_color == 1) attron(COLOR_WHITE);
@@ -1135,7 +1186,9 @@ void generate_map (){
             px = nx;
             py = ny;
         }
+        health_update();
     }
+    
     curs_set(1);
 }
 
