@@ -3,8 +3,6 @@
 //  rogue (parisa's version)
 //
 //  Created by parisa on 12/22/24.
-
-
 #include <stdio.h>
 #include <curses.h>
 #include <string.h>
@@ -13,6 +11,8 @@
 #include <time.h>
 #include <stdlib.h>
 #include <locale.h>
+
+
 #define MAX_SIZE 100
 #define HEIGHT 25
 #define WIDTH 50
@@ -24,6 +24,7 @@
 #define MAX_TRAP 3
 #define LOCKED_PASS_LEN 4
 #define PASS_TIMEOUT 30
+
 //403170933
 struct ROOM {
     int x, y, height, width;
@@ -49,6 +50,19 @@ struct secret_door {
 
 struct trap {
     int x, y;
+    int state;
+};
+
+struct food {
+    int x, y;
+    char * name;
+    int value;
+    int color;
+};
+
+struct picked_up {
+    int x, y;
+    char * name;
     int state;
 };
 
@@ -80,10 +94,19 @@ int level = 1;
 bool master_key [5] = {false};
 bool first_key [5] = {true};
 bool master_keys_broken [5] = {false};
+
+int health = 100;
+struct food foods [100];
+int food_count = 0;
+
+struct picked_up pocket [100];
+int pocket_count;
 //global stuff
 
 void generate_map ();
+int determine_color(char, int, int);
 
+//prototypes
 void pick_one (int highlight, char* menu_name, char * options[], int n) {
     attron(COLOR_PAIR(1));
     printw("%s: \n", menu_name);
@@ -112,7 +135,7 @@ void messages(char *what_happened, int maybe) {
         printw("Would you like to mend two broken Master Keys to enter? (y/n)\n");
     } else if (strcmp(what_happened, "key fixed") == 0) {
         printw("Two Master Keys have been mended. You can enter.\n");
-    } else if (strcmp(what_happened, "master key found") == 0) {
+    } else if (strcmp(what_happened, "picked up key") == 0) {
         attron(COLOR_PAIR(5));
         printw("You picked up a Master Key!\n");
         attroff(COLOR_PAIR(5));
@@ -128,6 +151,10 @@ void messages(char *what_happened, int maybe) {
         attron(COLOR_PAIR(8));
         printw("There are %d secret doors around you.\n", maybe);
         attroff(COLOR_PAIR(8));
+    } else if (strcmp(what_happened, "picked up food") == 0) {
+        attron(COLOR_PAIR(9));
+        printw("You picked up some %s!\n", foods[maybe].name);
+        attroff(COLOR_PAIR(9));
     }
 
     refresh();
@@ -178,6 +205,8 @@ void init_colors() {
     init_pair(4, COLOR_BLUE, COLOR_BLACK);
     init_pair(5, COLOR_YELLOW, COLOR_BLACK);
     init_pair(8, COLOR_WHITE, COLOR_RED);
+    init_pair(10, COLOR_WHITE, COLOR_BLACK);
+    
 }
 
 void customize_menu () {
@@ -219,7 +248,10 @@ void customize_menu () {
 void cheat_code_M () {
     for ( int j = 0; j < HEIGHT; j ++) {
         for ( int i = 0; i < WIDTH; i ++) {
+            int color = determine_color(map[j][i], i, j);
+            attron(COLOR_PAIR(color));
             mvaddch(j, i, map[j][i]);
+            attroff(COLOR_PAIR(color));
         }
     }
     refresh();
@@ -727,6 +759,29 @@ void locked_door (struct ROOM room) {
     
 }
 
+void pick_up (int y, int x) {
+    if (map[y][x] == '*') {
+        map[y][x] = '.';
+        pocket[pocket_count].x = x;
+        pocket[pocket_count].y = y;
+        pocket[pocket_count].name = "master key";
+        messages("picked up key", 0);
+        pocket_count++;
+    } else if (map[y][x] == '%') {
+        map[y][x] = '.';
+        pocket[pocket_count].x = x;
+        pocket[pocket_count].y = y;
+        pocket[pocket_count].name = "food";
+        int food_index = 0;
+        for ( int i = 0; i < food_count; i ++) {
+            if (foods[i].x == x && foods[i].y == y) {
+                food_index = i;
+            }
+        }
+        messages("picked up food", food_index);
+        pocket_count++;
+    }
+}
 void reveal_corridor (int px, int py) {
     
     for (int dy = -CORRIDOR_VISIBLE; dy <= CORRIDOR_VISIBLE; dy++) {
@@ -761,16 +816,69 @@ void player_in_room (int px, int py, struct ROOM rooms[], int room_count) {
     reveal_corridor(px, py);
 }
 
+/*wchar_t determine_char (char tile) {
+    if (tile == 'f') return L'✦';
+    else return tile;
+}
+*/
+
+int determine_color (char tile, int x, int y) {
+    if (tile == 'f') {
+        for ( int i = 0; i < food_count; i ++) {
+            if (foods[i].x == x && foods[i].y == y) {
+                return foods[i].color;
+            }
+        }
+    } else if (tile == '@') {
+        for (int j = 0; j < locked_door_count; j ++) {
+            if (locked[j].x == x && locked[j].y == y) {
+                if (locked[j].state == 0) return 2;
+                else return 9;
+            }
+        }
+    } else if (tile == '?') {
+        for ( int k = 0; k < secret_door_count; k ++) {
+            if (hiddens[k].x == x && hiddens[k].y == y) {
+                if (hiddens[k].state == 0) return 10;
+                else return 5;
+            }
+        }
+    } else if (tile == '<') {
+        return 9;
+    } else if (tile == '^') {
+        for (int n = 0; n < traps_count; n ++) {
+            if (traps[n].x == x && traps[n].y == y) {
+                if (traps[n].state == 0) return 10;
+                else return 6;
+            }
+        }
+    } else if (tile == '%') {
+        for ( int p = 0; p < food_count; p ++) {
+            if (foods[p].x == x && foods[p].y == y) {
+                return foods[p].color;
+            }
+        }
+    } else if (tile == '&') return 5;
+    else if (tile == '*') return 5;
+    return 10;
+}
+
+
 void render_map() {
-    for (int i = 0; i < HEIGHT; i++) {
-        for (int j = 0; j < WIDTH; j++) {
-            if(visible[i][j]) {
-                mvaddch(i, j, map[i][j]);
+    for (int j = 0; j < HEIGHT; j++) {
+        for (int i = 0; i < WIDTH; i++) {
+            if(visible[j][i]) {
+               // wchar_t display_char = determine_char(map[j][i]);
+                int color = determine_color(map[j][i], i, j);
+                attron(COLOR_PAIR(color));
+                mvaddch(j, i, map[j][i]);
+                attroff(COLOR_PAIR(color));
             } else {
-                mvaddch(i, j, ' ');
+                mvaddch(j, i, ' ');
             }
         }
     }
+    refresh();
 }
 
 void new_level () {
@@ -785,9 +893,39 @@ void stair_activated (char stair) {
     }
 }
 
-void movement (char ch, int * ny, int * nx) {
-    
+char * food_name (int color) {
+    char * name [] = {"Ambrosia", "Slightly Moldy Cheese", "Rock-hard Biscuit", "Questionable Apple", "Mystery Meat", "Infernal Steak", "Ethereal Berries", "Exploding Berries", "Potionberry Pie"};
+    if (color == 0) {
+        int which = rand () % 3;
+        return name[which];
+    } else if (color == 1) {
+        int which = 3 + rand () % 3;
+        return name[which];
+    } else {
+        int which = 6 + rand () % 3;
+        return name[which];
+    }
 }
+
+
+void add_food (struct ROOM room) {
+    for (int y = room.y; y < room.y + room.height; y++) {
+        if (food_count >= MAX_TRAP) break;
+        for (int x = room.x; x < room.x + room.width; x++) {
+            if (food_count >= MAX_TRAP) break;
+            if (rand () % 20 == 0 && map[y][x] == '.') {
+                int color = rand() % 3;
+                foods[food_count].color = color;
+                map[y][x] = '%';
+                foods[food_count].x = x;
+                foods[food_count].y = y;
+                foods[food_count].name = food_name(color);
+                food_count++;
+            }
+        }
+    }
+}
+
 void generate_map (){
     struct ROOM rooms [ROOM_COUNT];
     int room_count = 0;
@@ -813,6 +951,7 @@ void generate_map (){
             add_room(new_room);
             add_pillar(new_room);
             add_trap(new_room);
+            add_food(new_room);
             
             if (room_count > 0) {
                 corridor (rooms[room_count - 1].x + (rooms[room_count - 1].width - 1) / 2, rooms[room_count - 1].y + (rooms[room_count - 1].height -1) / 2, new_room.x + (new_room.width  -1)/ 2, new_room.y + (new_room.height -1) / 2);
@@ -961,6 +1100,7 @@ void generate_map (){
             }
             px = nx;
             py = ny;
+            pick_up(ny, nx);
             
             if (first_key[level]) {
                 messages("master key found", 0);
@@ -969,6 +1109,12 @@ void generate_map (){
                 master_key[level] = true;
                 first_key[level] = false;
             }
+        } else if (map[ny][nx] == '%') {
+            px = nx;
+            py = ny;
+            pick_up(ny, nx);
+
+            
         } else if(map[ny][nx] == '|' || map[ny][nx] == '-') {
             reveal_door(ny, nx);
         } else if (map[ny][nx] == '.') {
@@ -1357,8 +1503,6 @@ void main_menu (){
     }
 }
 
-#include <ncurses.h>
-#include <string.h>
 
 void load_welcome_page() {
     clear();
