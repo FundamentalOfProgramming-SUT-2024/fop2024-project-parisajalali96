@@ -85,6 +85,13 @@ struct weapon {
     char symbol;
     int state;
 };
+
+struct potion {
+    int x, y;
+    int type;
+    int state;
+    char * name;
+};
 // structs
 
 char map [HEIGHT][WIDTH];
@@ -131,6 +138,9 @@ int score = 0;
 
 struct weapon weapons[50];
 int weapon_count = 0;
+
+struct potion potions[50];
+int potion_count = 0;
 //global stuff
 
 void generate_map ();
@@ -173,19 +183,19 @@ void messages(char *what_happened, int maybe) {
         attroff(COLOR_PAIR(5));
     } else if (strcmp(what_happened, "cheat code M") == 0) {
         attron(COLOR_PAIR(5));
-        printw("You have entered full map mode. Press any key to continue.\n");
+        printw("You have entered full map mode. Press any key to continue.");
         attroff(COLOR_PAIR(5));
     } else if (strcmp(what_happened, "trap around") == 0) {
         attron(COLOR_PAIR(8));
-        printw("There are %d traps around you.\n", maybe);
+        printw("There are %d traps around you.", maybe);
         attroff(COLOR_PAIR(8));
     } else if (strcmp(what_happened, "secret door around") == 0) {
         attron(COLOR_PAIR(8));
-        printw("There are %d secret doors around you.\n", maybe);
+        printw("There are %d secret doors around you.", maybe);
         attroff(COLOR_PAIR(8));
     } else if (strcmp(what_happened, "picked up food") == 0) {
         attron(COLOR_PAIR(9));
-        printw("You picked up some %s!\n", foods[maybe].name);
+        printw("You picked up some %s!", foods[maybe].name);
         attroff(COLOR_PAIR(9));
     } else if (strcmp(what_happened, "picked up gold") == 0) {
         char type [10];
@@ -198,7 +208,7 @@ void messages(char *what_happened, int maybe) {
             added_gold = 50;
         }
         attron(COLOR_PAIR(5));
-        printw("You picked up a bag of %s! You earned %d more gold!", type, added_gold);
+        printw("You picked up a bag of %s and earned %d more gold!", type, added_gold);
         attroff(COLOR_PAIR(5));
         gold += added_gold;
         
@@ -213,6 +223,13 @@ void messages(char *what_happened, int maybe) {
         else strcpy(weapon_name, "Sword");
    
         printw("You picked up a %s!", weapon_name);
+    } else if (strcmp(what_happened, "picked up potion") == 0) {
+        char name [20];
+        if (maybe == 0) strcpy(name, "Elixir of Everlife");
+        else if (maybe == 1) strcpy(name, "Dragon's Blood");
+        else strcpy(name, "Stormrider's Kiss");
+
+        printw("You picked up The %s!", name);
     }
 
     refresh();
@@ -876,6 +893,20 @@ void pick_up (int y, int x) {
 
         messages("picked up weapon", type);
         pocket_count++;
+    } else if (map[y][x] == 'p') {
+        map[y][x] = '.';
+        pocket[pocket_count].x = x;
+        pocket[pocket_count].y = y;
+        pocket[pocket_count].name = "potions";
+        int type = 0;
+        for ( int i = 0; i < potion_count; i ++) {
+            if (potions[i].x == x && potions[i].y == y) {
+                type = potions[i].type;
+                potions[i].state = 0;
+            }
+        }
+        messages("picked up potion", type);
+        pocket_count++;
     }
 }
 void reveal_corridor (int px, int py) {
@@ -954,7 +985,12 @@ int determine_color (char tile, int x, int y) {
                 return foods[p].color;
             }
         }
-    } else if (tile == '$'){
+    } else if (tile == 'p') {
+        return 6;
+        
+    }
+    
+    else if (tile == '$'){
         for ( int m = 0; m < gold_count; m ++) {
             if (golds[m].x == x && golds[m].y == y) {
                 return golds[m].type;
@@ -1059,7 +1095,7 @@ void health_bar (int health) {
         }
     }
     addch(']');
-    mvprintw(LINES -1, COLS - 37, "Health: ");
+    mvprintw(LINES -1, COLS - 39, "Health: ");
     mvprintw(LINES - 1, COLS - 20 - 10 + 20 + 2, "%d%%", (health * 100) / MAX_HEALTH);
     refresh();
 
@@ -1220,6 +1256,24 @@ void add_gold (struct ROOM room) {
     }
 }
 
+void add_potion (struct ROOM room) {
+    for (int y = room.y; y < room.y + room.height; y++) {
+       // if (food_count >= MAX_FOOD) break;
+        for (int x = room.x; x < room.x + room.width; x++) {
+            //if (food_count >= MAX_FOOD) break;
+            if (rand () % 50 == 0 && map[y][x] == '.') {
+                int type = rand() % 3;
+    
+                map[y][x] = 'p';
+                potions[potion_count].x = x;
+                potions[potion_count].y = y;
+                potions[potion_count].type = type;
+                potions[potion_count].state = -1;
+                potion_count++;
+            }
+        }
+    }
+}
 void add_food (struct ROOM room) {
     for (int y = room.y; y < room.y + room.height; y++) {
        // if (food_count >= MAX_FOOD) break;
@@ -1274,6 +1328,7 @@ void generate_map (){
             add_food(new_room);
             add_gold(new_room);
             add_weapon(new_room);
+            add_potion(new_room);
             
             if (room_count > 0) {
                 corridor (rooms[room_count - 1].x + (rooms[room_count - 1].width - 1) / 2, rooms[room_count - 1].y + (rooms[room_count - 1].height -1) / 2, new_room.x + (new_room.width  -1)/ 2, new_room.y + (new_room.height -1) / 2);
@@ -1453,6 +1508,12 @@ void generate_map (){
             py = ny;
             pick_up(ny, nx);
             
+        } else if (map[ny][nx] == 'p') {
+            px = nx;
+            py = ny;
+            pick_up(ny, nx);
+            
+            
         } else if(map[ny][nx] == '|' || map[ny][nx] == '-') {
             reveal_door(ny, nx);
         } else if (map[ny][nx] == '.') {
@@ -1465,6 +1526,7 @@ void generate_map (){
             px = nx;
             py = ny;
         }
+        
         
         health_update();
         refresh();
