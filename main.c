@@ -26,7 +26,8 @@
 #define PASS_TIMEOUT 30
 #define MAX_HEALTH 100
 #define HEALTH_R 1
-#define HEALTH_TIME 5000000
+#define HEALTH_TIME 20
+#define MAX_GOLD 1000
 //403170933
 struct ROOM {
     int x, y, height, width;
@@ -58,8 +59,13 @@ struct trap {
 struct food {
     int x, y;
     char * name;
-    int value;
     int color;
+    int state;
+};
+
+struct gold {
+    int x, y;
+    int type;
     int state;
 };
 
@@ -74,6 +80,11 @@ struct picked_up_food {
     char * name;
 };
 
+struct weapon {
+    int x, y;
+    char symbol;
+    int state;
+};
 // structs
 
 char map [HEIGHT][WIDTH];
@@ -113,12 +124,20 @@ int pocket_count;
 time_t last_health_update = 0;
 
 struct picked_up_food pocket_food [9];
+struct gold golds[MAX_FOOD];
+int gold_count = 0;
+int gold = 100;
+int score = 0;
+
+struct weapon weapons[50];
+int weapon_count = 0;
 //global stuff
 
 void generate_map ();
 int determine_color(char, int, int);
 void show_level();
 void food_window();
+void desplay_gold();
 //prototypes
 void pick_one (int highlight, char* menu_name, char * options[], int n) {
     attron(COLOR_PAIR(1));
@@ -168,6 +187,22 @@ void messages(char *what_happened, int maybe) {
         attron(COLOR_PAIR(9));
         printw("You picked up some %s!\n", foods[maybe].name);
         attroff(COLOR_PAIR(9));
+    } else if (strcmp(what_happened, "picked up gold") == 0) {
+        char type [10];
+        int added_gold;
+        if (maybe == 3) {
+            strcpy(type, "Skygold");
+            added_gold = 100;
+        } else {
+            strcpy(type, "Stargold");
+            added_gold = 50;
+        }
+        attron(COLOR_PAIR(5));
+        printw("You picked up a bag of %s! You earned %d more gold!", type, added_gold);
+        attroff(COLOR_PAIR(5));
+        gold += added_gold;
+        
+        desplay_gold();
     }
 
     refresh();
@@ -795,6 +830,21 @@ void pick_up (int y, int x) {
         }
         messages("picked up food", food_index);
         pocket_count++;
+    } else if (map[y][x] == '$') {
+        map[y][x] = '.';
+        pocket[pocket_count].x = x;
+        pocket[pocket_count].y = y;
+        pocket[pocket_count].name = "gold";
+        int gold_type = 0;
+        for ( int i = 0; i < gold_count; i ++) {
+            if (golds[i].x == x && golds[i].y == y) {
+                gold_type = golds[i].type;
+                golds[i].state = 0;
+
+            }
+        }
+        messages("picked up gold", gold_type);
+        pocket_count++;
     }
 }
 void reveal_corridor (int px, int py) {
@@ -873,6 +923,12 @@ int determine_color (char tile, int x, int y) {
                 return foods[p].color;
             }
         }
+    } else if (tile == '$'){
+        for ( int m = 0; m < gold_count; m ++) {
+            if (golds[m].x == x && golds[m].y == y) {
+                return golds[m].type;
+            }
+        }
     } else if (tile == '&') return 5;
     else if (tile == '*') return 5;
     return 10;
@@ -935,13 +991,22 @@ void health_update () {
         last_health_update = current_time;
     }
 }
-    
+
+
 void show_level () {
-    attron(COLOR_PAIR(5));
+    attron(COLOR_PAIR(2));
     mvprintw(LINES - 1, 0, "Level: %d", level);
+    attroff(COLOR_PAIR(2));
+    refresh();
+}
+
+void desplay_gold () {
+    attron(COLOR_PAIR(5));
+    mvprintw(LINES -1, COLS/2, "Gold: %d", gold);
     attroff(COLOR_PAIR(5));
     refresh();
 }
+
 void health_bar (int health) {
     int filled = (health * 20) / MAX_HEALTH;
     move(LINES - 1, COLS - 20 - 10);
@@ -961,7 +1026,7 @@ void health_bar (int health) {
         }
     }
     addch(']');
-
+    mvprintw(LINES -1, COLS - 37, "Health: ");
     mvprintw(LINES - 1, COLS - 20 - 10 + 20 + 2, "%d%%", (health * 100) / MAX_HEALTH);
     refresh();
 
@@ -972,18 +1037,18 @@ void food_choice (char * name ) {
         if (strcmp(foods[i].name, name) == 0 && foods[i].state == 0) {
             foods[i].state =1;
             health += 5;
-            health_update();
+            health_bar(health);
             break;
         }
     }
-    food_window();
+    //food_window();
 }
 
 void food_window () {//damn what is this
     WINDOW * food = newwin(10, 30, 0, 0);
+    wclear(food);
     box(food, 0, 0);
-    
-    
+
     int ex_berry = 0, eth_berry = 0, pie = 0, amb = 0, cheese = 0, biscuit = 0, steak = 0, apple = 0, meat = 0;
     for ( int i = 0; i < food_count; i ++) {
         if (strcmp(foods[i].name, "Exploding Berries") ==0 && foods[i].state == 0) ex_berry++;
@@ -1045,7 +1110,10 @@ void food_window () {//damn what is this
         identifier ++;
     }
     
+    if (ex_berry == 0 && eth_berry == 0 && pie == 0 && amb == 0 && cheese == 0 && biscuit == 0 && steak == 0 && apple == 0 && meat == 0 ) mvwprintw(food, identifier + 1, 1, "You don't have any food to consume!");
+    
     wrefresh(food);
+
     
     int choice = getch();
 
@@ -1065,12 +1133,59 @@ void E_command () {
     getch();
     food_window();
 }
+
+void add_weapon (struct ROOM room) {
+    for (int y = room.y; y < room.y + room.height; y++) {
+       // if (food_count >= MAX_FOOD) break;
+        for (int x = room.x; x < room.x + room.width; x++) {
+            //if (food_count >= MAX_FOOD) break;
+            if (rand () % 50 == 0 && map[y][x] == '.') {
+                int color = rand() % 10;
+                if ((color % 3) == 0) {
+                    color = 3;
+              } else {
+                    color = 5;
+                }
+                golds[gold_count].type = color;
+                map[y][x] = '$';
+                golds[gold_count].x = x;
+                golds[gold_count].y = y;
+                golds[gold_count].state = -1;
+                gold_count++;
+            }
+        }
+    }
+}
+
+void add_gold (struct ROOM room) {
+    for (int y = room.y; y < room.y + room.height; y++) {
+       // if (food_count >= MAX_FOOD) break;
+        for (int x = room.x; x < room.x + room.width; x++) {
+            //if (food_count >= MAX_FOOD) break;
+            if (rand () % 50 == 0 && map[y][x] == '.') {
+                int color = rand() % 10;
+                if ((color % 3) == 0) {
+                    color = 3;
+              } else {
+                    color = 5;
+                }
+                golds[gold_count].type = color;
+                map[y][x] = '$';
+                golds[gold_count].x = x;
+                golds[gold_count].y = y;
+                golds[gold_count].state = -1;
+                gold_count++;
+            }
+        }
+    }
+}
+
 void add_food (struct ROOM room) {
     for (int y = room.y; y < room.y + room.height; y++) {
-        if (food_count >= MAX_FOOD) break;
+       // if (food_count >= MAX_FOOD) break;
         for (int x = room.x; x < room.x + room.width; x++) {
-            if (food_count >= MAX_FOOD) break;
-            if (rand () % 20 == 0 && map[y][x] == '.') {
+            //if (food_count >= MAX_FOOD) break;
+            if (rand () % 50 == 0 && map[y][x] == '.') {
                 int color = rand() % 3;
                 if (color == 0) {
                     color = 5;
@@ -1117,6 +1232,7 @@ void generate_map (){
             add_pillar(new_room);
             add_trap(new_room);
             add_food(new_room);
+            add_gold(new_room);
             
             if (room_count > 0) {
                 corridor (rooms[room_count - 1].x + (rooms[room_count - 1].width - 1) / 2, rooms[room_count - 1].y + (rooms[room_count - 1].height -1) / 2, new_room.x + (new_room.width  -1)/ 2, new_room.y + (new_room.height -1) / 2);
@@ -1143,9 +1259,10 @@ void generate_map (){
     while (1) {
         curs_set(0);
         //clear();
-        //refresh();
+        refresh();
         health_bar(health);
         show_level();
+        desplay_gold();
         render_map();
         init_colors();
         if (hero_color == 1) attron(COLOR_WHITE);
@@ -1283,7 +1400,12 @@ void generate_map (){
             px = nx;
             py = ny;
             pick_up(ny, nx);
-
+            
+        }
+        else if (map[ny][nx] == '$') {
+            px = nx;
+            py = ny;
+            pick_up(ny, nx);
             
         } else if(map[ny][nx] == '|' || map[ny][nx] == '-') {
             reveal_door(ny, nx);
@@ -1297,6 +1419,7 @@ void generate_map (){
             px = nx;
             py = ny;
         }
+        
         health_update();
         refresh();
     }
