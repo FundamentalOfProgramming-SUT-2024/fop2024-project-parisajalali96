@@ -207,12 +207,11 @@ void messages(char *what_happened, int maybe) {
             strcpy(type, "Stargold");
             added_gold = 50;
         }
-        attron(COLOR_PAIR(5));
-        printw("You picked up a bag of %s and earned %d more gold!", type, added_gold);
-        attroff(COLOR_PAIR(5));
         gold += added_gold;
-        
         desplay_gold();
+        attron(COLOR_PAIR(5));
+        mvprintw(0, 0, "You picked up a bag of %s and earned %d more gold!", type, added_gold);
+        attroff(COLOR_PAIR(5));
     } else if (strcmp(what_happened, "picked up weapon") == 0) {
         char weapon_name [20];
         
@@ -230,6 +229,17 @@ void messages(char *what_happened, int maybe) {
         else strcpy(name, "Stormrider's Kiss");
 
         printw("You picked up The %s!", name);
+    } else if (strcmp(what_happened, "ate food") == 0) {
+        attron(COLOR_PAIR(9));
+        printw("You successfully consumed the food!");
+        attroff(COLOR_PAIR(9));
+
+    } else if (strcmp(what_happened, "took weapon") == 0) {
+        attron(COLOR_PAIR(9));
+        printw("You are now weilding the weapon!");
+        attroff(COLOR_PAIR(9));
+    } else if (strcmp(what_happened, "took potion") == 0) {
+        
     }
 
     refresh();
@@ -1114,7 +1124,7 @@ void food_choice (char * name ) {
 }
 
 void food_window () {//damn what is this
-    WINDOW * food = newwin(10, 30, 0, 0);
+    WINDOW * food = newwin(10, 40, 0, 0);
     wclear(food);
     box(food, 0, 0);
 
@@ -1179,13 +1189,17 @@ void food_window () {//damn what is this
         identifier ++;
     }
     
-    if (ex_berry == 0 && eth_berry == 0 && pie == 0 && amb == 0 && cheese == 0 && biscuit == 0 && steak == 0 && apple == 0 && meat == 0 ) mvwprintw(food, identifier + 1, 1, "You don't have any food to consume!");
+    if (ex_berry == 0 && eth_berry == 0 && pie == 0 && amb == 0 && cheese == 0 && biscuit == 0 && steak == 0 && apple == 0 && meat == 0 ) {
+        char text [50] = "You don't have any food to consume!";
+        int x = (40 - strlen(text)) / 2;
+        mvwprintw(food, 4, x, "%s", text);
+    }
     
     wrefresh(food);
 
     
     int choice = getch();
-
+    choice = choice - '0';
     if (choice == ex_berry_id) food_choice("Exploding Berries");
     else if (choice == eth_berry_id) food_choice("Ethereal Berries");
     else if (choice == pie_id) food_choice("Potionberry Pie");
@@ -1195,10 +1209,150 @@ void food_window () {//damn what is this
     else if (choice == steak_id) food_choice("Infernal Steak");
     else if (choice == meat_id) food_choice("Mystery Meat");
     else if (choice == apple_id) food_choice("Questionable Apple");
+    if ( choice != '\n') {
+        messages("ate food", 0);
+    }
+
+}
+
+void weapon_choice (char symbol) {
+    for ( int i = 0; i < weapon_count; i ++) {
+        if (weapons[i].symbol == symbol && weapons[i].state == 0) {
+            weapons[i].state =1;
+            break;
+        }
+    }
+}
+
+void weapon_window () {
+    WINDOW * arsenal = newwin(10, 40, 0, 0);
+    wclear(arsenal);
+    box(arsenal, 0, 0);
+
+    int mace = 0, dag = 0, wand = 0, arrow = 0, sword = 0;
+    for ( int i = 0; i < weapon_count; i ++) {
+        if (weapons[i].symbol == 'm' && weapons[i].state == 0) mace++;
+        if (weapons[i].symbol == 'd' && weapons[i].state == 0) dag++;
+        if (weapons[i].symbol == '~' && weapons[i].state == 0) wand++;
+        if (weapons[i].symbol == 'a' && weapons[i].state == 0) arrow++;
+        if (weapons[i].symbol == '!' && weapons[i].state == 0) sword++;
+    }
     
+    int mace_id = 0, dag_id = 0, wand_id = 0, arrow_id = 0, sword_id = 0;
+    int identifier = 1;
+    if (mace != 0) {
+        mvwprintw(arsenal, identifier + 1, 1, "%d. %d Maces", identifier, mace);
+        mace_id = identifier;
+        identifier++;
+    }
+    if (dag != 0) {
+        mvwprintw(arsenal, identifier + 1, 1, "%d. %d Dagger", identifier, dag);
+        dag_id = identifier;
+        identifier ++;
+    }
+    if (wand != 0) {
+        mvwprintw(arsenal, identifier + 1, 1, "%d. %d Magic Wand",identifier, wand);
+        wand_id = identifier;
+        identifier ++;
+    }
+    if (arrow != 0) {
+        mvwprintw(arsenal, identifier + 1, 1, "%d. %d Normal Arrow",identifier, arrow);
+        arrow_id = identifier;
+        identifier ++;
+    }
+    if (sword != 0) {
+        mvwprintw(arsenal, identifier + 1, 1, "%d. %d Sword",identifier, sword);
+        sword_id = identifier;
+        identifier ++;
+    }
+    
+    if (mace == 0 && dag == 0 && arrow == 0 && sword == 0 && wand == 0) {
+        char text [50] = "You don't have any weapons to wield!";
+        int x = (40 - strlen(text)) / 2;
+        mvwprintw(arsenal, 5, x, "%s", text);
+    }
+    
+    wrefresh(arsenal);
+
+    
+    int choice = getch();
+    choice = choice - '0';
+    if (choice == mace_id) weapon_choice('m');
+    else if (choice == dag_id) weapon_choice('d');
+    else if (choice == arrow_id) weapon_choice('a');
+    else if (choice == wand_id) weapon_choice('~');
+    else if (choice == sword_id) weapon_choice('!');
+  
+    messages("took weapon", 0);
+
+}
+void potion_choice (int type) {
+    
+    for ( int i = 0; i < potion_count; i ++) {
+        if (potions[i].type == type && potions[i].state == 0) {
+            potions[i].state =1;
+            break;
+        }
+    }
+}
+void potion_window () {
+    WINDOW * potion = newwin(10, 40, 0, 0);
+    wclear(potion);
+    box(potion, 0, 0);
+
+    int elix = 0, drag = 0, kiss = 0;
+    for ( int i = 0; i < potion_count; i ++) {
+        if (potions[i].type == 0 && potions[i].state == 0) elix++;
+        if (potions[i].type == 1 && potions[i].state == 0) drag++;
+        if (potions[i].type == 2 && potions[i].state == 0) kiss++;
+    }
+    
+    int elix_id = 0, drag_id = 0, kiss_id = 0;
+    int identifier = 1;
+    if (elix != 0) {
+        mvwprintw(potion, identifier + 1, 1, "%d. %d Elixir of Everlife", identifier, elix);
+        elix_id = identifier;
+        identifier++;
+    }
+    if (drag != 0) {
+        mvwprintw(potion, identifier + 1, 1, "%d. %d Dragon's Blood", identifier, drag);
+        drag_id = identifier;
+        identifier++;
+    }
+    if (kiss != 0) {
+        mvwprintw(potion, identifier + 1, 1, "%d. %d Stormrider's Kiss", identifier, kiss);
+        kiss_id = identifier;
+        identifier++;
+    }
+    if (elix == 0 && drag == 0 && kiss == 0) {
+        char text [50] = "You don't have any potions to drink!";
+        int x = (40 - strlen(text)) / 2;
+        mvwprintw(potion, 5, x, "%s", text);
+    }
+    wrefresh(potion);
+
+    
+    int choice = getch();
+    choice = choice - '0';
+    if (choice == elix_id) potion_choice(0);
+    else if (choice == drag_id) potion_choice(1);
+    else if (choice == kiss_id) potion_choice(2);
+  
+    messages("took potion", 0);
+
+}
+void p_command () {
+    mvprintw(0, 0,"What potion would you like to drink? (press * for the list)");
+    getch();
+    potion_window();
+}
+void i_command () {
+    mvprintw(0, 0,"What weapon would you like to wield? (press * for the list)");
+    getch();
+    weapon_window();
 }
 void E_command () {
-    mvprintw(0, 0,"What would you like to eat? (press * for the list)");
+    mvprintw(0, 0,"What food would you like to eat? (press * for the list)");
     getch();
     food_window();
 }
@@ -1397,6 +1551,10 @@ void generate_map (){
             cheat_code_s(ny, nx);
         } else if (ch == 'E') {
             E_command();
+        } else if (ch == 'i') {
+            i_command();
+        } else if (ch == 'p') {
+            p_command();
         }
         else if (ch == 'f') {
             int condition [2] = {0};
@@ -1909,27 +2067,29 @@ void main_menu (){
 
 
 void load_welcome_page() {
+    curs_set(0);
     clear();
     int height = 15, width = 55;
     int start_y =0;
     int start_x = 0;
 
     attron(COLOR_PAIR(2));
-    mvprintw(start_y + 1, start_x + 8, "                           /   \\");
-    mvprintw(start_y + 2, start_x + 8, "_                  )      ((   ))     (");
-    mvprintw(start_y + 3, start_x + 8, "(@)               /|\\      ))_((     /|\\                   _");
-    mvprintw(start_y + 4, start_x + 8, "|-|`\\            / | \\    (/\\|/\\)   / | \\                (@)");
-    mvprintw(start_y + 5, start_x + 8, "| |-------------/--|-voV---\\`|'/--Vov-|--\\--------------|-|");
-    mvprintw(start_y + 6, start_x + 8, "|-|                '^`     (o o)     '^`                  | |");
-    mvprintw(start_y + 7, start_x + 8, "| |                        `\\Y/'                         |-|");
-    mvprintw(start_y + 8, start_x + 8, "|-|                                                       | |");
-    mvprintw(start_y + 9, start_x + 8, "| |                                                       |-|");
-    mvprintw(start_y + 10, start_x + 8,"|_|_______________________________________________________| |");
-    mvprintw(start_y + 11, start_x + 8, "(@)       l   /\\ /         ( (       \\ /\\   l         `\\|-|");
-    mvprintw(start_y + 12, start_x + 8, "         l /   V           \\ \\        V  \\ l            (@)");
-    mvprintw(start_y + 13, start_x + 8, "         l/                _) )_           \\I");
-    mvprintw(start_y + 14, start_x + 8, "                          `\\ /'");
-    mvprintw(start_y + 15, start_x + 8, "                             `");
+    int x = 10;
+    mvprintw(start_y + 1 + x, start_x + 8 +x, "                           /   \\");
+    mvprintw(start_y + 2 +x, start_x + 8 +x, "_                  )      ((   ))     (");
+    mvprintw(start_y + 3 +x, start_x + 8 +x, "(@)               /|\\      ))_((     /|\\                   _");
+    mvprintw(start_y + 4 +x, start_x + 8 +x, "|-|`\\            / | \\    (/\\|/\\)   / | \\                (@)");
+    mvprintw(start_y + 5 +x, start_x + 8 +x, "| |-------------/--|-voV---\\`|'/--Vov-|--\\--------------|-|");
+    mvprintw(start_y + 6 +x, start_x + 8 +x, "|-|                '^`     (o o)     '^`                  | |");
+    mvprintw(start_y + 7 +x, start_x + 8 +x, "| |                        `\\Y/'                         |-|");
+    mvprintw(start_y + 8 +x, start_x + 8 +x, "|-|                                                       | |");
+    mvprintw(start_y + 9 +x, start_x + 8 +x, "| |                                                       |-|");
+    mvprintw(start_y + 10 +x, start_x + 8 +x,"|_|_______________________________________________________| |");
+    mvprintw(start_y + 11 +x, start_x + 8 +x, "(@)       l   /\\ /         ( (       \\ /\\   l         `\\|-|");
+    mvprintw(start_y + 12 +x, start_x + 8 +x, "         l /   V           \\ \\        V  \\ l            (@)");
+    mvprintw(start_y + 13 +x, start_x + 8 +x, "         l/                _) )_           \\I");
+    mvprintw(start_y + 14 +x, start_x + 8 +x, "                          `\\ /'");
+    mvprintw(start_y + 15 +x, start_x + 8 +x, "                             `");
     attroff(COLOR_PAIR(2));
     refresh();
     
@@ -1937,11 +2097,13 @@ void load_welcome_page() {
     char welcome[] = "Welcome to the Dungeon of Doom!";
     int welcome_len = strlen(welcome);
     int start = (width - welcome_len) / 2;
-    mvprintw(start_y + 8, 23, "%s", welcome);
+    mvprintw(start_y + 8 +x, 23 +x, "%s", welcome);
 
     attroff(COLOR_PAIR(8));
     refresh();
     getch();
+    curs_set(1);
+
 }
 
 
