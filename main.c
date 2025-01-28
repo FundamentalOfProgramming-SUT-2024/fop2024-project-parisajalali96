@@ -203,6 +203,16 @@ void messages(char *what_happened, int maybe) {
         gold += added_gold;
         
         desplay_gold();
+    } else if (strcmp(what_happened, "picked up weapon") == 0) {
+        char weapon_name [20];
+        
+        if(maybe == 1) strcpy(weapon_name, "Mace");
+        else if (maybe == 2) strcpy(weapon_name, "Daggger");
+        else if (maybe == 3) strcpy(weapon_name, "Magic Wand");
+        else if (maybe == 4) strcpy(weapon_name, "Normal Arrow");
+        else strcpy(weapon_name, "Sword");
+   
+        printw("You picked up a %s!", weapon_name);
     }
 
     refresh();
@@ -845,6 +855,27 @@ void pick_up (int y, int x) {
         }
         messages("picked up gold", gold_type);
         pocket_count++;
+    } else if (map[y][x] == 'm' || map[y][x] == 'd' || map[y][x] == '~' || map[y][x] == 'a' || map[y][x] == '!') {
+        map[y][x] = '.';
+        pocket[pocket_count].x = x;
+        pocket[pocket_count].y = y;
+        pocket[pocket_count].name = "weapon";
+        char symbol = 'm';
+        int type;
+        for ( int i = 0; i < weapon_count; i ++) {
+            if (weapons[i].x == x && weapons[i].y == y) {
+                symbol = weapons[i].symbol;
+                weapons[i].state = 0;
+            }
+        }
+        if (symbol == 'm') type = 1;
+        else if (symbol == 'd') type = 2;
+        else if (symbol == '~') type = 3;
+        else if (symbol == 'a') type = 4;
+        else type = 5;
+
+        messages("picked up weapon", type);
+        pocket_count++;
     }
 }
 void reveal_corridor (int px, int py) {
@@ -929,6 +960,8 @@ int determine_color (char tile, int x, int y) {
                 return golds[m].type;
             }
         }
+    }else if (map[y][x] == 'm' || map[y][x] == 'd' || map[y][x] == '~' || map[y][x] == 'a' || map[y][x] == '!') {
+        return 4;
     } else if (tile == '&') return 5;
     else if (tile == '*') return 5;
     return 10;
@@ -1140,18 +1173,25 @@ void add_weapon (struct ROOM room) {
         for (int x = room.x; x < room.x + room.width; x++) {
             //if (food_count >= MAX_FOOD) break;
             if (rand () % 50 == 0 && map[y][x] == '.') {
-                int color = rand() % 10;
-                if ((color % 3) == 0) {
-                    color = 3;
-              } else {
-                    color = 5;
+                int type = rand() % 5;
+                char symbol;
+                if (type == 0) {
+                    symbol = 'm';
+                } else if (type == 1) {
+                    symbol = 'd';
+                } else if (type == 2) {
+                    symbol = '~';
+                } else if (type == 3) {
+                    symbol = 'a';
+                } else {
+                    symbol = '!';
                 }
-                golds[gold_count].type = color;
-                map[y][x] = '$';
-                golds[gold_count].x = x;
-                golds[gold_count].y = y;
-                golds[gold_count].state = -1;
-                gold_count++;
+                weapons[weapon_count].symbol = symbol;
+                map[y][x] = symbol;
+                weapons[weapon_count].x = x;
+                weapons[weapon_count].y = y;
+                weapons[weapon_count].state = -1;
+                weapon_count++;
             }
         }
     }
@@ -1233,6 +1273,7 @@ void generate_map (){
             add_trap(new_room);
             add_food(new_room);
             add_gold(new_room);
+            add_weapon(new_room);
             
             if (room_count > 0) {
                 corridor (rooms[room_count - 1].x + (rooms[room_count - 1].width - 1) / 2, rooms[room_count - 1].y + (rooms[room_count - 1].height -1) / 2, new_room.x + (new_room.width  -1)/ 2, new_room.y + (new_room.height -1) / 2);
@@ -1403,6 +1444,11 @@ void generate_map (){
             
         }
         else if (map[ny][nx] == '$') {
+            px = nx;
+            py = ny;
+            pick_up(ny, nx);
+            
+        } else if (map[ny][nx] == 'm' || map[ny][nx] == 'd' || map[ny][nx] == '~' || map[ny][nx] == 'a' || map[ny][nx] == '!') {
             px = nx;
             py = ny;
             pick_up(ny, nx);
