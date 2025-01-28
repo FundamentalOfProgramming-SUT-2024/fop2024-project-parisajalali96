@@ -60,12 +60,18 @@ struct food {
     char * name;
     int value;
     int color;
+    int state;
 };
 
 struct picked_up {
     int x, y;
     char * name;
     int state;
+};
+
+struct picked_up_food {
+    int count;
+    char * name;
 };
 
 // structs
@@ -105,11 +111,14 @@ struct picked_up pocket [100];
 int pocket_count;
 
 time_t last_health_update = 0;
+
+struct picked_up_food pocket_food [9];
 //global stuff
 
 void generate_map ();
 int determine_color(char, int, int);
 void show_level();
+void food_window();
 //prototypes
 void pick_one (int highlight, char* menu_name, char * options[], int n) {
     attron(COLOR_PAIR(1));
@@ -780,6 +789,8 @@ void pick_up (int y, int x) {
         for ( int i = 0; i < food_count; i ++) {
             if (foods[i].x == x && foods[i].y == y) {
                 food_index = i;
+                foods[i].state = 0;
+
             }
         }
         messages("picked up food", food_index);
@@ -886,10 +897,9 @@ void render_map() {
 }
 
 void new_level () {
+    level++;
     init_map();
     generate_map();
-    level++;
-    show_level();
 }
 
 void stair_activated (char stair) {
@@ -957,6 +967,104 @@ void health_bar (int health) {
 
 }
 
+void food_choice (char * name ) {
+    for ( int i = 0; i < food_count; i ++) {
+        if (strcmp(foods[i].name, name) == 0 && foods[i].state == 0) {
+            foods[i].state =1;
+            health += 5;
+            health_update();
+            break;
+        }
+    }
+    food_window();
+}
+
+void food_window () {//damn what is this
+    WINDOW * food = newwin(10, 30, 0, 0);
+    box(food, 0, 0);
+    
+    
+    int ex_berry = 0, eth_berry = 0, pie = 0, amb = 0, cheese = 0, biscuit = 0, steak = 0, apple = 0, meat = 0;
+    for ( int i = 0; i < food_count; i ++) {
+        if (strcmp(foods[i].name, "Exploding Berries") ==0 && foods[i].state == 0) ex_berry++;
+        else if (strcmp(foods[i].name, "Ethereal Berries") ==0 && foods[i].state == 0) eth_berry++;
+        else if (strcmp(foods[i].name, "Potionberry Pie") ==0 && foods[i].state == 0) pie++;
+        else if (strcmp(foods[i].name, "Ambrosia") ==0 && foods[i].state == 0) amb++;
+        else if (strcmp(foods[i].name, "Slightly Moldy Cheese") ==0 && foods[i].state == 0) cheese++;
+        else if (strcmp(foods[i].name, "Rock-hard Biscuit") ==0 && foods[i].state == 0) biscuit++;
+        else if (strcmp(foods[i].name, "Infernal Steak") ==0 && foods[i].state == 0) steak++;
+        else if (strcmp(foods[i].name, "Mystery Meat") ==0 && foods[i].state == 0) meat++;
+        else if (strcmp(foods[i].name, "Questionable Apple") ==0 && foods[i].state == 0) apple++;
+    }
+    
+    int ex_berry_id = 0, eth_berry_id = 0, pie_id = 0, amb_id = 0, cheese_id = 0, biscuit_id = 0, steak_id = 0, apple_id = 0, meat_id = 0;
+    int identifier = 1;
+    if (ex_berry != 0) {
+        mvwprintw(food, identifier + 1, 1, "%d. %d Exploding Berries", identifier, ex_berry);
+        ex_berry_id = identifier;
+        identifier++;
+    }
+    if (eth_berry != 0) {
+        mvwprintw(food, identifier + 1, 1, "%d. %d Ethereal Berries", identifier, eth_berry);
+        eth_berry_id = identifier;
+        identifier ++;
+    }
+    if (pie != 0) {
+        mvwprintw(food, identifier + 1, 1, "%d. %d Potionberry Pie",identifier, pie);
+        pie_id = identifier;
+        identifier ++;
+    }
+    if (amb != 0) {
+        mvwprintw(food, identifier + 1, 1, "%d. %d Ambrosia",identifier, amb);
+        amb_id = identifier;
+        identifier ++;
+    }
+    if (cheese != 0) {
+        mvwprintw(food, identifier + 1, 1, "%d. %d Slighlty Moldy Cheese",identifier, cheese);
+        cheese_id = identifier;
+        identifier ++;
+    }
+    if (biscuit != 0) {
+        mvwprintw(food, identifier + 1, 1, "%d. %d Rock-hard Biscuit ",identifier, biscuit);
+        biscuit_id = identifier;
+        identifier ++;
+    }
+    if (steak != 0) {
+        mvwprintw(food, identifier + 1, 1, "%d. %d Infernal Steak",identifier, steak);
+        steak_id = identifier;
+        identifier ++;
+    }
+    if (apple != 0) {
+        mvwprintw(food, identifier + 1, 1, "%d. %d Questionable Apple",identifier, apple);
+        apple_id = identifier;
+        identifier ++;
+    }
+    if (meat != 0) {
+        mvwprintw(food, identifier + 1, 1, "%d. %d Mystery Meat",identifier, meat);
+        meat_id = identifier;
+        identifier ++;
+    }
+    
+    wrefresh(food);
+    
+    int choice = getch();
+
+    if (choice == ex_berry_id) food_choice("Exploding Berries");
+    else if (choice == eth_berry_id) food_choice("Ethereal Berries");
+    else if (choice == pie_id) food_choice("Potionberry Pie");
+    else if (choice == amb_id) food_choice("Ambrosia");
+    else if (choice == cheese_id) food_choice("Slightly Moldy Cheese");
+    else if (choice == biscuit_id) food_choice("Rock-hard Biscuit");
+    else if (choice == steak_id) food_choice("Infernal Steak");
+    else if (choice == meat_id) food_choice("Mystery Meat");
+    else if (choice == apple_id) food_choice("Questionable Apple");
+    
+}
+void E_command () {
+    mvprintw(0, 0,"What would you like to eat? (press * for the list)");
+    getch();
+    food_window();
+}
 void add_food (struct ROOM room) {
     for (int y = room.y; y < room.y + room.height; y++) {
         if (food_count >= MAX_FOOD) break;
@@ -976,6 +1084,7 @@ void add_food (struct ROOM room) {
                 foods[food_count].x = x;
                 foods[food_count].y = y;
                 foods[food_count].name = food_name(color);
+                foods[food_count].state = -1;
                 food_count++;
             }
         }
@@ -983,7 +1092,6 @@ void add_food (struct ROOM room) {
 }
 
 void generate_map (){
-    show_level();
     struct ROOM rooms [ROOM_COUNT];
     int room_count = 0;
     
@@ -1035,8 +1143,9 @@ void generate_map (){
     while (1) {
         curs_set(0);
         //clear();
-        refresh();
+        //refresh();
         health_bar(health);
+        show_level();
         render_map();
         init_colors();
         if (hero_color == 1) attron(COLOR_WHITE);
@@ -1073,6 +1182,8 @@ void generate_map (){
         }
         else if (ch == 's') {
             cheat_code_s(ny, nx);
+        } else if (ch == 'E') {
+            E_command();
         }
         else if (ch == 'f') {
             int condition [2] = {0};
@@ -1187,6 +1298,7 @@ void generate_map (){
             py = ny;
         }
         health_update();
+        refresh();
     }
     
     curs_set(1);
