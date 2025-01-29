@@ -142,6 +142,9 @@ int weapon_count = 0;
 
 struct potion potions[50];
 int potion_count = 0;
+struct ROOM rooms[10][ROOM_COUNT];
+int room_count[10] = {0};
+int g_state = 0;
 //global stuff
 
 void generate_map ();
@@ -149,6 +152,8 @@ int determine_color(char, int, int);
 void show_level();
 void food_window();
 void desplay_gold();
+void end_game (char);
+void health_bar (int);
 //prototypes
 void pick_one (int highlight, char* menu_name, char * options[], int n) {
     attron(COLOR_PAIR(1));
@@ -187,13 +192,13 @@ void messages(char *what_happened, int maybe) {
         printw("You have entered full map mode. Press any key to continue.");
         attroff(COLOR_PAIR(5));
     } else if (strcmp(what_happened, "trap around") == 0) {
-        attron(COLOR_PAIR(8));
+        attron(COLOR_PAIR(2));
         printw("There are %d traps around you.", maybe);
-        attroff(COLOR_PAIR(8));
+        attroff(COLOR_PAIR(2));
     } else if (strcmp(what_happened, "secret door around") == 0) {
-        attron(COLOR_PAIR(8));
+        attron(COLOR_PAIR(2));
         printw("There are %d secret doors around you.", maybe);
-        attroff(COLOR_PAIR(8));
+        attroff(COLOR_PAIR(2));
     } else if (strcmp(what_happened, "picked up food") == 0) {
         attron(COLOR_PAIR(9));
         printw("You picked up some %s!", foods[maybe].name);
@@ -242,6 +247,15 @@ void messages(char *what_happened, int maybe) {
         attroff(COLOR_PAIR(9));
     } else if (strcmp(what_happened, "took potion") == 0) {
         
+    } else if (strcmp(what_happened, "enter room") == 0) {
+        if (maybe == 1) printw("You have entered an Enchant Room!");
+        else if (maybe == 2) printw("You have entered The Treasure Room!");
+
+    } else if (strcmp(what_happened, "picked up treasure") == 0) {
+        attron(COLOR_PAIR(5));
+        mvprintw(0, 0, "You open the ancient chest, and golden light floods the room.");
+        mvprintw(1, 0, "The legendary treasure is yours!");
+        attroff(COLOR_PAIR(5));
     }
 
     refresh();
@@ -294,6 +308,7 @@ void init_colors() {
     init_pair(8, COLOR_WHITE, COLOR_RED);
     init_pair(10, COLOR_WHITE, COLOR_BLACK);
     init_pair(11, COLOR_BLACK, COLOR_YELLOW);
+    init_pair (12, COLOR_BLACK, COLOR_GREEN);
     
     
 }
@@ -469,13 +484,18 @@ void add_pillar (struct ROOM room) {
 
 void add_trap (struct ROOM room) {
     int type = room.type;
-    int prob;
-    if (type == 2) prob = 5;
-    else prob = 30;
+    int prob, max;
+    if (type == 2) {
+        prob = 5;
+        max = 15;
+    } else {
+        prob = 30;
+        max = 3;
+    }
     for (int y = room.y; y < room.y + room.height; y++) {
-        if (traps_count >= MAX_TRAP) break;
+        if (traps_count >= max) break;
         for (int x = room.x; x < room.x + room.width; x++) {
-            if (traps_count >= MAX_TRAP) break;
+            if (traps_count >= max) break;
             if (rand () % prob == 0 && map[y][x] == '.') {
                 traps[traps_count].x = x;
                 traps[traps_count].y = y;
@@ -526,6 +546,10 @@ void reveal_door (int ny, int nx) {
     }
 }
 
+void lose_health (int value) {
+    health -= value;
+    health_bar(health);
+}
 void reveal_trap (int ny, int nx) {
     int which_trap = 0;
     for ( int i = 0; i < traps_count; i ++) {
@@ -541,6 +565,9 @@ void reveal_trap (int ny, int nx) {
         attroff(COLOR_PAIR(2));
         refresh();
     }
+    
+    lose_health(5);
+    
     
 }
 
@@ -995,6 +1022,7 @@ void reveal_room(struct ROOM room) {
             visible[y][x] = true;
         }
     }
+    if (room.type != 0) messages("enter room", room.type);
 }
 
 void player_in_room (int px, int py, struct ROOM rooms[], int room_count) {
@@ -1053,6 +1081,14 @@ int determine_color (char tile, int x, int y) {
     } else if (tile == 'p') {
         return 6;
         
+    } else if (tile == '|' || tile == '-') {
+        for ( int i = 0; i < room_count[level]; i ++) {
+            if ((x >= rooms[level][i].x && x <= rooms[level][i].x + rooms[level][i].width ) && (y >= rooms[level][i].y && y <= rooms[level][i].y + rooms[level][i].height ) ) {
+                if (rooms[level][i].type == 2) return 5;
+                else if (rooms[level][i].type == 1) return 6;
+                else return 10;
+            }
+        }
     }
     
     else if (tile == '$'){
@@ -1145,6 +1181,7 @@ void desplay_gold () {
 }
 
 void health_bar (int health) {
+    if (health > 100) health = 100;
     int filled = (health * 20) / MAX_HEALTH;
     move(LINES - 1, COLS - 20 - 10);
     addch('[');
@@ -1445,23 +1482,34 @@ void add_weapon (struct ROOM room) {
     }
 }
 
-void add_treasture (struct ROOM room) {
-    bool T_placed = false;
+void picked_tresure () {
     
+    messages("picked up treasure", 0);
+    end_game('w');
+    
+}
+
+void add_treasure (struct ROOM room) {
+    bool treasure = false;
     for (int y = room.y; y < room.y + room.height; y++) {
-        if (T_placed) break;
+        if (treasure) return;
         for (int x = room.x; x < room.x + room.width; x++) {
-            if (T_placed) break;
+            if (treasure) return;
             if (rand () % 20 == 0 && map[y][x] == '.') {
+                attron(COLOR_PAIR(9));
                 map[y][x] = 'T';
+                attroff(COLOR_PAIR(9));
+                treasure = true;
+                refresh();
+
             }
         }
     }
     
-    if (!T_placed) {
-        int y = room.y + room.height / 2;
-        int x = room.x + room.width / 2;
-        map[y][x] = 'T';
+    if (!treasure) {
+        int center_x = room.x + room.width / 2;
+        int center_y = room.y + room.height / 2;
+        map[center_y][center_x] = 'T';
     }
 
 }
@@ -1600,15 +1648,50 @@ void load_prev_game () {
  */
 void end_game (char state) {
     if (state == 'w') {
+        clear();
+        refresh();
+        int start_y = (LINES - 10) / 2;
+        int start_x = (COLS - 50) / 2;
+        WINDOW * winner = newwin(10, 50, start_y, start_x);
+        wbkgd(winner, COLOR_PAIR(12));
+        box(winner, 0, 0);
+   
         
+        char msg [20] = "YOU WIN!";
+        mvwprintw(winner, 2, (50 - strlen(msg)) / 2, "%s", msg);
+        mvwprintw(winner, 4, 2, "%s", "With the treasure in your hands and the dungeon");
+        mvwprintw(winner, 5, 2, "%s", "fading behind, you emerge victorious at last!");
+        
+        wrefresh(winner);
+        getch();
+        delwin(winner);
+    } else {
+        clear();
+        refresh();
+        int start_y = (LINES - 10) / 2;
+        int start_x = (COLS - 50) / 2;
+        WINDOW * loser = newwin(10, 50, start_y, start_x);
+        wbkgd(loser, COLOR_PAIR(8));
+        box(loser, 0, 0);
+   
+        
+        char msg [20] = "YOU LOSE!";
+        mvwprintw(loser, 2, (50 - strlen(msg)) / 2, "%s", msg);
+        mvwprintw(loser, 4, 2, "%s", "Darkness consumes you as you fall...");
+        mvwprintw(loser, 5, 2, "%s", "The dungeon claims another soul.");
+        
+        wrefresh(loser);
+        getch();
+        delwin(loser);
     }
 }
+void cheat_g () {
+    g_state = 1;
+}
 void generate_map (){
-    struct ROOM rooms [ROOM_COUNT];
-    int room_count = 0;
     bool treasure_room_place = false;
     init_map();
-    while (room_count < ROOM_COUNT) {
+    while (room_count[level] < ROOM_COUNT) {
         int type = 0;
         struct ROOM new_room;
         new_room.width = ROOM_MIN_SIZE + rand() % (ROOM_MAX_SIZE - ROOM_MIN_SIZE + 1);
@@ -1618,23 +1701,19 @@ void generate_map (){
         
         bool overlap = false;
         
-        for ( int i = 0; i < room_count ; i ++ ){
-            if (room_overlap(new_room, rooms[i])) {
+        for ( int i = 0; i < room_count[level] ; i ++ ){
+            if (room_overlap(new_room, rooms[level][i])) {
                 overlap = true;
                 break;
             }
         }
         
         if (!overlap) {
-            if (level == 4 && !treasure_room_place) {
-                new_room.type = 2;
-                treasure_room_place = true;
-                add_treasture(new_room);
-            } else if ( level < 4) {
+           if ( level < 4) {
                 int prob = rand () % 6;
                 if (prob == 0) new_room.type = 1;
                 else new_room.type = 0;
-            }
+            } else new_room.type = 0;
             add_room(new_room);
             add_pillar(new_room);
             add_trap(new_room);
@@ -1645,10 +1724,10 @@ void generate_map (){
             
             if (room_count > 0) {
                 corridor(
-                    rooms[room_count - 1].x + (rooms[room_count - 1].width - 2) / 2,
-                    rooms[room_count - 1].y + (rooms[room_count - 1].height - 2) / 2,
-                    new_room.x + (new_room.width - 2) / 2,
-                    new_room.y + (new_room.height - 2) / 2
+                         rooms[level][room_count[level] - 1].x + 1 + (rooms[level][room_count[level] - 1].width - 2) / 2,
+                    rooms[level][room_count[level] - 1].y + 1 + (rooms[level][room_count[level] - 1].height - 2) / 2,
+                    new_room.x + 1 + (new_room.width - 2) / 2,
+                    new_room.y + 1 + (new_room.height - 2) / 2
                 );
 
                 door_fix(new_room);
@@ -1656,22 +1735,31 @@ void generate_map (){
                 if ( rand () % 6 == 0) add_hidden_door(new_room);
                 
             }
-            rooms[room_count++] = new_room;
+            rooms[level][room_count[level]++] = new_room;
         }
+    }
+    
+    if (level == 4 && !treasure_room_place) {
+        int room = rand () % 6;
+        if (room == 0) room = 1;
+        rooms[level][room].type = 2;
+        treasure_room_place = true;
+        add_treasure (rooms[level][room]);
     }
 
     
     int room_with_stairs = rand () %6;
     int room_with_key = rand () %6;
-    add_stairs(rooms[room_with_stairs]);
-    add_master_key(rooms[room_with_key]);
-    if (rand() % 4 == 0) locked_door(rooms[0]);
-    int px = rooms[0].x + 1, py = rooms[0].y + 1;
-    player_in_room(px, py, rooms, room_count);
+    add_stairs(rooms[level][room_with_stairs]);
+    add_master_key(rooms[level][room_with_key]);
+    if (rand() % 4 == 0) locked_door(rooms[level][0]);
+    int px = rooms[level][0].x + 1, py = rooms[level][0].y + 1;
+    player_in_room(px, py, rooms[level], room_count[level]);
     
     int ch;
     
     while (1) {
+        //g_state = 0;
         curs_set(0);
        // clear();
         refresh();
@@ -1720,6 +1808,8 @@ void generate_map (){
             i_command();
         } else if (ch == 'p') {
             p_command();
+        } else if (ch == 'g') {
+            cheat_g();
         }
         else if (ch == 'f') {
             int condition [2] = {0};
@@ -1755,7 +1845,7 @@ void generate_map (){
         if ( map[ny][nx] == '#' || map[ny][nx] == '+' || map[ny][nx] == '^' || map[ny][nx] == '?') {
             px = nx;
             py = ny;
-            player_in_room(px, py, rooms, room_count);
+            player_in_room(px, py, rooms[level], room_count[level]);
         } else if (map[ny][nx] == '<') {
             char enter = getch();
             stair_activated(enter);
@@ -1799,43 +1889,54 @@ void generate_map (){
         } else if (map[ny][nx] == '&') {
             show_password(nx, ny);
         } else if (map[ny][nx] == '*') {
-            int break_prob = rand() % 10;
-            if (break_prob == 0) {
-                master_keys_broken [level] = true;
+            if (!g_state) {
+                int break_prob = rand() % 10;
+                if (break_prob == 0) {
+                    master_keys_broken [level] = true;
+                    
+                }
+                px = nx;
+                py = ny;
+                pick_up(ny, nx);
                 
-            }
-            px = nx;
-            py = ny;
-            pick_up(ny, nx);
-            
-            if (first_key[level]) {
-                messages("master key found", 0);
-            }
-            if (first_key[level]) {
-                master_key[level] = true;
-                first_key[level] = false;
+                if (first_key[level]) {
+                    messages("master key found", 0);
+                }
+                if (first_key[level]) {
+                    master_key[level] = true;
+                    first_key[level] = false;
+                    g_state = 0;
+                }
+            } else {
+                px = nx;
+                py = ny;
             }
         } else if (map[ny][nx] == '%') {
             px = nx;
             py = ny;
-            pick_up(ny, nx);
-            
+            if (!g_state) pick_up(ny, nx);
+            g_state = 0;
+        } else if (map[ny][nx] == 'T') {
+            px = nx;
+            py = ny;
+            if (!g_state) picked_tresure();
+            g_state = 0;
         }
         else if (map[ny][nx] == '$') {
             px = nx;
             py = ny;
-            pick_up(ny, nx);
-            
+            if (!g_state) pick_up(ny, nx);
+            g_state = 0;
         } else if (map[ny][nx] == 'm' || map[ny][nx] == 'd' || map[ny][nx] == '~' || map[ny][nx] == 'a' || map[ny][nx] == '!') {
             px = nx;
             py = ny;
-            pick_up(ny, nx);
-            
+            if (!g_state) pick_up(ny, nx);
+            g_state = 0;
         } else if (map[ny][nx] == 'p') {
             px = nx;
             py = ny;
-            pick_up(ny, nx);
-            
+            if (!g_state) pick_up(ny, nx);
+            g_state = 0;
             
         } else if(map[ny][nx] == '|' || map[ny][nx] == '-') {
             reveal_door(ny, nx);
@@ -1896,7 +1997,8 @@ void setting_menu (){
         }
     }
 }
-        
+       
+
 void start_game_menu () {
     int ch;
     int choice = 0;
