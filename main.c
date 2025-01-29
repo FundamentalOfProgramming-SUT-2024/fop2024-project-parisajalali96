@@ -31,7 +31,7 @@
 #define MAX_GOLD 1000
 //403170933
 struct ROOM {
-    int x, y, height, width;
+    int x, y, height, width, type;
 };
 
 struct scores {
@@ -468,11 +468,15 @@ void add_pillar (struct ROOM room) {
 }
 
 void add_trap (struct ROOM room) {
+    int type = room.type;
+    int prob;
+    if (type == 2) prob = 5;
+    else prob = 30;
     for (int y = room.y; y < room.y + room.height; y++) {
         if (traps_count >= MAX_TRAP) break;
         for (int x = room.x; x < room.x + room.width; x++) {
             if (traps_count >= MAX_TRAP) break;
-            if (rand () % 30 == 0 && map[y][x] == '.') {
+            if (rand () % prob == 0 && map[y][x] == '.') {
                 traps[traps_count].x = x;
                 traps[traps_count].y = y;
                 traps[traps_count].state = 0;
@@ -1057,7 +1061,10 @@ int determine_color (char tile, int x, int y) {
                 return golds[m].type;
             }
         }
-    }else if (map[y][x] == 'm' || map[y][x] == 'd' || map[y][x] == '~' || map[y][x] == 'a' || map[y][x] == '!') {
+    } else if (tile == 'T') {
+        return 5;
+    }
+    else if (map[y][x] == 'm' || map[y][x] == 'd' || map[y][x] == '~' || map[y][x] == 'a' || map[y][x] == '!') {
         return 4;
     } else if (tile == '&') return 5;
     else if (tile == '*') return 5;
@@ -1438,6 +1445,26 @@ void add_weapon (struct ROOM room) {
     }
 }
 
+void add_treasture (struct ROOM room) {
+    bool T_placed = false;
+    
+    for (int y = room.y; y < room.y + room.height; y++) {
+        if (T_placed) break;
+        for (int x = room.x; x < room.x + room.width; x++) {
+            if (T_placed) break;
+            if (rand () % 20 == 0 && map[y][x] == '.') {
+                map[y][x] = 'T';
+            }
+        }
+    }
+    
+    if (!T_placed) {
+        int y = room.y + room.height / 2;
+        int x = room.x + room.width / 2;
+        map[y][x] = 'T';
+    }
+
+}
 void add_gold (struct ROOM room) {
     for (int y = room.y; y < room.y + room.height; y++) {
        // if (food_count >= MAX_FOOD) break;
@@ -1462,11 +1489,15 @@ void add_gold (struct ROOM room) {
 }
 
 void add_potion (struct ROOM room) {
+    int prob;
+    int type = room.type;
+    if (type == 1) prob = 5;
+    else prob = 50;
     for (int y = room.y; y < room.y + room.height; y++) {
        // if (food_count >= MAX_FOOD) break;
         for (int x = room.x; x < room.x + room.width; x++) {
             //if (food_count >= MAX_FOOD) break;
-            if (rand () % 50 == 0 && map[y][x] == '.') {
+            if (rand () % prob == 0 && map[y][x] == '.') {
                 int type = rand() % 3;
     
                 map[y][x] = 'p';
@@ -1575,9 +1606,10 @@ void end_game (char state) {
 void generate_map (){
     struct ROOM rooms [ROOM_COUNT];
     int room_count = 0;
-    
+    bool treasure_room_place = false;
     init_map();
     while (room_count < ROOM_COUNT) {
+        int type = 0;
         struct ROOM new_room;
         new_room.width = ROOM_MIN_SIZE + rand() % (ROOM_MAX_SIZE - ROOM_MIN_SIZE + 1);
         new_room.height = ROOM_MIN_SIZE + rand() % (ROOM_MAX_SIZE - ROOM_MIN_SIZE + 1);
@@ -1594,6 +1626,15 @@ void generate_map (){
         }
         
         if (!overlap) {
+            if (level == 4 && !treasure_room_place) {
+                new_room.type = 2;
+                treasure_room_place = true;
+                add_treasture(new_room);
+            } else if ( level < 4) {
+                int prob = rand () % 6;
+                if (prob == 0) new_room.type = 1;
+                else new_room.type = 0;
+            }
             add_room(new_room);
             add_pillar(new_room);
             add_trap(new_room);
@@ -1616,9 +1657,9 @@ void generate_map (){
                 
             }
             rooms[room_count++] = new_room;
-            
         }
     }
+
     
     int room_with_stairs = rand () %6;
     int room_with_key = rand () %6;
