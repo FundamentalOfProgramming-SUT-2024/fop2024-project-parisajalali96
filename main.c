@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <locale.h>
 
+
 #define MAX_SIZE 100
 #define HEIGHT 25
 #define WIDTH 50
@@ -23,7 +24,7 @@
 #define MAX_TRAP 3
 #define MAX_FOOD 3
 #define LOCKED_PASS_LEN 4
-#define PASS_TIMEOUT 30
+#define PASS_TIMEOUT 10
 #define MAX_HEALTH 100
 #define HEALTH_R 1
 #define HEALTH_TIME 20
@@ -210,7 +211,8 @@ void messages(char *what_happened, int maybe) {
         gold += added_gold;
         desplay_gold();
         attron(COLOR_PAIR(5));
-        mvprintw(0, 0, "You picked up a bag of %s and earned %d more gold!", type, added_gold);
+        mvprintw(0, 0, "You picked up a bag of %s", type);
+        mvprintw(1, 0, "earned %d more gold!",added_gold);
         attroff(COLOR_PAIR(5));
     } else if (strcmp(what_happened, "picked up weapon") == 0) {
         char weapon_name [20];
@@ -291,6 +293,8 @@ void init_colors() {
     init_pair(5, COLOR_YELLOW, COLOR_BLACK);
     init_pair(8, COLOR_WHITE, COLOR_RED);
     init_pair(10, COLOR_WHITE, COLOR_BLACK);
+    init_pair(11, COLOR_BLACK, COLOR_YELLOW);
+    
     
 }
 
@@ -503,14 +507,14 @@ void add_stairs (struct ROOM room) {
 }
 
 void reveal_door (int ny, int nx) {
-    int which_door = 0;
+    int which_door = -1;
     for ( int i = 0; i < secret_door_count; i ++) {
         if(hiddens[i].x == nx && hiddens[i].y == ny) {
             which_door = i;
             hiddens[i].state = 1;
         }
     }
-    if (hiddens[which_door].state) {
+    if (which_door != -1 && hiddens[which_door].state) {
         attron(COLOR_PAIR(2));
         map[ny][nx] = '?';
         attroff(COLOR_PAIR(2));
@@ -705,6 +709,7 @@ void show_password(int px, int py) {
     }
 
     password_show_time = 0;
+    werase(password_win);
     delwin(password_win);
 }
 
@@ -732,15 +737,12 @@ int lock_pass_input(int px, int py) {
     int start_col1 = (win_width - msg1_len) / 2;
 
     char msg2 [] = "The password, please!: ";
-    int msg2_len = strlen(msg2
-                          );
+    int msg2_len = strlen(msg2);
     int start_col2 = (win_width - msg2_len) / 2;
     mvwprintw(password_win, 3, start_col1, "%s", msg1);
     mvwprintw(password_win, 4, start_col2, "%s", msg2);
-
-    wrefresh(password_win);
-    
     mvwgetstr(password_win, 5, start_col2, is_pass);
+    wrefresh(password_win);
     noecho();
 
     size_t len = strlen(is_pass);
@@ -748,29 +750,78 @@ int lock_pass_input(int px, int py) {
         is_pass[len - 1] = '\0';
     }
 
+ 
 
     if (strcmp(password, is_pass) == 0 ) {
         locked[which_door].state = 1;
-        char msg3 [] = "Aha! The door swings open for you!";
-        int msg3_len = strlen(msg3);
-        int start_col3 = (win_width - msg3_len) / 2;
-        
-        mvwprintw(password_win, 3, start_col3, "%s", msg3);
-        wrefresh(password_win);
-        delwin(password_win);
+        messages("door opened", 0);
         attron(COLOR_PAIR(2));
         mvaddch(py, px, '@');
         map[py][px] = '@';
         attroff(COLOR_PAIR(2));
         refresh();
     } else {
-        char msg4 [] = "Wrong password. Nice try, though!";
+        WINDOW * warning_1 = newwin(win_height, win_width, py - 2, px + 2);
+        wbkgd(warning_1, COLOR_PAIR(11));
+        box(warning_1, 0, 0);
+        char msg4 [] = "WARNING! Try again!";
         int msg4_len = strlen(msg4);
         int start_col4 = (win_width - msg4_len) / 2;
         
-        mvwprintw(password_win, 3, start_col4, "%s", msg4);
-        wrefresh(password_win);
-        delwin(password_win);
+        mvwprintw(warning_1, 3, start_col4, "%s", msg4);
+        echo();
+        mvwgetstr(warning_1, 5, start_col4, is_pass);
+        noecho();
+
+        size_t len = strlen(is_pass);
+        if (len > 0 && is_pass[len - 1] == '\n') {
+            is_pass[len - 1] = '\0';
+        }
+        wrefresh(warning_1);
+        delwin(warning_1);
+        
+        if (strcmp(password, is_pass) == 0 ) {
+            locked[which_door].state = 1;
+            messages("door opened", 0);
+        } else {
+            WINDOW * warning_2 = newwin(win_height, win_width, py - 2, px + 2);
+            wbkgd(warning_2, COLOR_PAIR(8));
+            box(warning_2, 0, 0);
+            char msg5 [] = "WARNING! Last Try!";
+            int msg5_len = strlen(msg5);
+            int start_col5 = (win_width - msg5_len) / 2;
+            
+            mvwprintw(warning_2, 3, start_col5, "%s", msg5);
+            echo();
+            mvwgetstr(warning_2, 5, start_col5, is_pass);
+            noecho();
+
+            size_t len = strlen(is_pass);
+            if (len > 0 && is_pass[len - 1] == '\n') {
+                is_pass[len - 1] = '\0';
+            }
+            wrefresh(warning_2);
+            delwin(warning_2);
+            
+            if (strcmp(password, is_pass) == 0 ) {
+                locked[which_door].state = 1;
+                messages("door opened", 0);
+            } else {
+                WINDOW * warning_3 = newwin(win_height, win_width, py - 2, px + 2);
+                wbkgd(warning_3, COLOR_PAIR(8));
+                box(warning_3, 0, 0);
+                char msg6 [] = "WARNING! Security Lockdown!";
+                int msg6_len = strlen(msg6);
+                int start_col6 = (win_width - msg6_len) / 2;
+                
+                mvwprintw(warning_3, 3, start_col6, "%s", msg6);
+                wrefresh(warning_3);
+                getch();
+                delwin(warning_3);
+            }
+            
+        }
+        
     }
     return which_door;
 }
@@ -1454,6 +1505,73 @@ void add_food (struct ROOM room) {
     }
 }
 
+/*void save_game (int px, int py) {
+    FILE * save_game = fopen("prev_games.bin", "wb");
+    
+    fprintf(save_game, "Health: %d", health);
+    fprintf(save_game, "Gold: %d", gold);
+    fprintf(save_game, "Level: %d", level);
+    fprintf(save_game, "Position: %d, %d", py, px);
+
+    for ( int k = 0; k < food_count; k ++) {
+        fprintf(save_game, "Food: %s %d %d %d %d",foods[k].name, foods[k].state, foods[k].color, foods[k].x, foods[k].y );
+    }
+    
+    for ( int n = 0; n < potion_count; n ++) {
+        fprintf(save_game, "Potions: %s %d %d %d %d",potions[n].name, potions[n].state, potions[n].type, potions[n].x, potions[n].y );
+    }
+    
+    for ( int n = 0; n < potion_count; n ++) {
+        fprintf(save_game, "Potions: %s %d %d %d %d",potions[n].name, potions[n].state, potions[n].type, potions[n].x, potions[n].y );
+    }
+    
+    for ( int m = 0; m < weapon_count; m ++) {
+        fprintf(save_game, "Weapons: %c %d %d %d",weapons[m].symbol, weapons[m].state, weapons[m].x, weapons[m].y );
+    }
+    
+    
+    for ( int j = 0; j < HEIGHT; j ++) {
+        for ( int i = 0; i < WIDTH; i ++) {
+            int visited = 0;
+            if (visible[j][i]) visited = 1;
+            else visited = 0;
+            fprintf(save_game, "Map: %c %d",map[j][i], visited );
+        }
+    }
+    
+}
+
+void load_prev_game () {
+    FILE * prev_game = fopen("prev_games.bin", "rb");
+    
+    for (int j = 0; j < HEIGHT; j++) {
+        for (int i = 0; i < WIDTH; i++) {
+            fscanf(prev_game, "[%d,%d]", &map[i][j].type, &map[i][j].is_visible);
+            if (j < MAP_HEIGHT - 1) {
+                fgetc(file);
+            }
+        }
+        fgetc(file);
+    }
+
+    fclose(file);
+}
+    
+    
+    
+    
+    
+    
+    
+    
+    
+}
+ */
+void end_game (char state) {
+    if (state == 'w') {
+        
+    }
+}
 void generate_map (){
     struct ROOM rooms [ROOM_COUNT];
     int room_count = 0;
@@ -1485,7 +1603,13 @@ void generate_map (){
             add_potion(new_room);
             
             if (room_count > 0) {
-                corridor (rooms[room_count - 1].x + (rooms[room_count - 1].width - 1) / 2, rooms[room_count - 1].y + (rooms[room_count - 1].height -1) / 2, new_room.x + (new_room.width  -1)/ 2, new_room.y + (new_room.height -1) / 2);
+                corridor(
+                    rooms[room_count - 1].x + (rooms[room_count - 1].width - 2) / 2,
+                    rooms[room_count - 1].y + (rooms[room_count - 1].height - 2) / 2,
+                    new_room.x + (new_room.width - 2) / 2,
+                    new_room.y + (new_room.height - 2) / 2
+                );
+
                 door_fix(new_room);
               // if ( rand () % 6 == 0) locked_door(new_room);
                 if ( rand () % 6 == 0) add_hidden_door(new_room);
@@ -1508,7 +1632,7 @@ void generate_map (){
     
     while (1) {
         curs_set(0);
-        //clear();
+       // clear();
         refresh();
         health_bar(health);
         show_level();
@@ -1902,7 +2026,7 @@ void play_menu () {
         else if (ch == '\n') {
             if (choice == 0) { //guest
                 clear();
-                printw("You are no playing as a guest!\n");
+                printw("You are now playing as a guest!\n");
                 printw("Press any key to continue.\n");
                 getch();
                 start_game_menu();
