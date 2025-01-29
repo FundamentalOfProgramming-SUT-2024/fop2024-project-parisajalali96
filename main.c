@@ -93,6 +93,12 @@ struct potion {
     int state;
     char * name;
 };
+
+struct monster {
+    int x, y;
+    int health;
+    char type;
+};
 // structs
 
 char map [HEIGHT][WIDTH];
@@ -256,6 +262,28 @@ void messages(char *what_happened, int maybe) {
         mvprintw(0, 0, "You open the ancient chest, and golden light floods the room.");
         mvprintw(1, 0, "The legendary treasure is yours!");
         attroff(COLOR_PAIR(5));
+    } else if (strcmp(what_happened, "attack") == 0 ) {
+        if (maybe == 0) {
+            attron(COLOR_PAIR(2));
+            printw("The Deamon attacks!");
+            attroff(COLOR_PAIR(2));
+        } else if (maybe == 1) {
+            attron(COLOR_PAIR(2));
+            printw("The Fire Breathing Monster scorches you with a blast of flames!");
+            attroff(COLOR_PAIR(2));
+        } else if (maybe == 2) {
+            attron(COLOR_PAIR(2));
+            printw("The Giant swings it's fist at you!");
+            attroff(COLOR_PAIR(2));
+        } else if (maybe == 3) {
+            attron(COLOR_PAIR(2));
+            printw("The Snake hisses and attacks!");
+            attroff(COLOR_PAIR(2));
+        } else if (maybe == 4) {
+            attron(COLOR_PAIR(2));
+            printw("The Undeed damages you greatly!");
+            attroff(COLOR_PAIR(2));
+        }
     }
 
     refresh();
@@ -1180,8 +1208,39 @@ void desplay_gold () {
     refresh();
 }
 
+int monster_check (int x, int y, struct monster monster) {
+    if ((monster.x == x + 1 || monster.x == x - 1) && (monster.x == y + 1 || monster.y == y - 1)) {
+        return 1;
+    } else return 0;
+}
+
+void monster_attack (struct monster monster)  {
+    char type = monster.type;
+    if (type == 'D') {
+        messages("attack", 0);
+        lose_health(5);
+    }
+    else if (type == 'F') {
+        messages("attack", 1);
+        lose_health(5);
+    }
+    else if (type == 'G') {
+        messages("attack", 2);
+        lose_health(5);
+    }
+    else if (type == 'S') {
+        messages("attack", 3);
+        lose_health(5);
+    }
+    else if (type == 'U') {
+        messages("attack", 4);
+        lose_health(5);
+    }
+
+}
 void health_bar (int health) {
     if (health > 100) health = 100;
+    if (health <= 0) end_game('l');
     int filled = (health * 20) / MAX_HEALTH;
     move(LINES - 1, COLS - 20 - 10);
     addch('[');
