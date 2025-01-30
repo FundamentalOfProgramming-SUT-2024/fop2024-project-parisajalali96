@@ -98,6 +98,7 @@ struct monster {
     int x, y;
     int health;
     char type;
+    int state;
 };
 // structs
 
@@ -151,6 +152,9 @@ int potion_count = 0;
 struct ROOM rooms[10][ROOM_COUNT];
 int room_count[10] = {0};
 int g_state = 0;
+
+struct monster monsters[40];
+int monster_count = 0;
 //global stuff
 
 void generate_map ();
@@ -160,6 +164,9 @@ void food_window();
 void desplay_gold();
 void end_game (char);
 void health_bar (int);
+void monster_move (int, int, struct monster *);
+void render_map();
+int monster_check (int , int , struct monster );
 //prototypes
 void pick_one (int highlight, char* menu_name, char * options[], int n) {
     attron(COLOR_PAIR(1));
@@ -510,6 +517,37 @@ void add_pillar (struct ROOM room) {
     }
 }
 
+void add_monster (struct ROOM room) {
+    int prob;
+    if (level == 1) prob = 50;
+    else if (level == 2) prob = 30;
+    else if (level == 3) prob = 25;
+    else prob = 20;
+
+    for (int y = room.y; y < room.y + room.height; y++) {
+        //if (traps_count >= max) break;
+        for (int x = room.x; x < room.x + room.width; x++) {
+            int type = rand () % 10;
+            char symbol = 'D';
+            if (type == 0 || type == 2 || type == 3) symbol = 'D';//D
+            else if (type == 4 || type == 5) symbol = 'F';//F
+            else if (type == 6 || type == 7) symbol = 'G';//G
+            else if (type == 8) symbol = 'S'; //S
+            else if (type == 9) symbol = 'U'; //U
+           // if (traps_count >= max) break;
+            if (rand () % prob == 0 && map[y][x] == '.') {
+                monsters[monster_count].x = x;
+                monsters[monster_count].y = y;
+                monsters[monster_count].type = symbol;
+                map[y][x] = symbol;
+                monsters[monster_count].state = 0;
+                monsters[monster_count].health = 100;
+                monster_count++;
+            }
+        }
+    }
+}
+
 void add_trap (struct ROOM room) {
     int type = room.type;
     int prob, max;
@@ -517,13 +555,13 @@ void add_trap (struct ROOM room) {
         prob = 5;
         max = 15;
     } else {
-        prob = 30;
+        prob = 50;
         max = 3;
     }
     for (int y = room.y; y < room.y + room.height; y++) {
-        if (traps_count >= max) break;
+        //if (traps_count >= max) break;
         for (int x = room.x; x < room.x + room.width; x++) {
-            if (traps_count >= max) break;
+           // if (traps_count >= max) break;
             if (rand () % prob == 0 && map[y][x] == '.') {
                 traps[traps_count].x = x;
                 traps[traps_count].y = y;
@@ -1051,17 +1089,48 @@ void reveal_room(struct ROOM room) {
         }
     }
     if (room.type != 0) messages("enter room", room.type);
+    
 }
 
+struct ROOM which_room (int px, int py) {
+    struct ROOM room;
+    room.x = -1;
+    room.y = -1;
+    for (int i = 0; i < room_count[level]; i++) {
+        if (px >= rooms[level][i].x && px <= rooms[level][i].x + rooms[level][i].width &&
+            py >= rooms[level][i].y && py <= rooms[level][i].y + rooms[level][i].height) {
+            room = rooms[level][i];
+        }
+    }
+    return room;
+}
+void while_inside_room (int px, int py, struct ROOM room) {
+    
+    for ( int i = 0; i < monster_count; i ++) {
+        if ((monsters[i].x >= room.x && monsters[i].x <= room.x + room.width) && (monsters[i].y >= room.y && monsters[i].y <= room.y + room.height) && room.type != 1) {
+            if (monsters[i].type == 'G' || monsters[i].type == 'S' || monsters[i].type == 'U') {
+                monster_move(px, py, &monsters[i]);
+            }
+            monster_check(px, py, monsters[i]);
+        }
+    }
+    //render_map();
+    
+}
+ 
 void player_in_room (int px, int py, struct ROOM rooms[], int room_count) {
+    struct ROOM room;
     for (int i = 0; i < room_count; i++) {
-        struct ROOM r = rooms[i];
-        if (px >= r.x && px < r.x + r.width &&
-            py >= r.y && py < r.y + r.height) {
-            reveal_room(r);
+         room = rooms[i];
+        if (px >= room.x && px < room.x + room.width &&
+            py >= room.y && py < room.y + room.height) {
+            reveal_room(room);
         }
     }
     reveal_corridor(px, py);
+    
+    //while_inside_room(px, py, room);
+    
 }
 
 /*wchar_t determine_char (char tile) {
@@ -1077,7 +1146,10 @@ int determine_color (char tile, int x, int y) {
                 return foods[i].color;
             }
         }
-    } else if (tile == '@') {
+    } else if (tile == 'D' || tile == 'F' || tile == 'G' || tile == 'S' || tile == 'U') {
+        return 2;
+    }
+    else if (tile == '@') {
         for (int j = 0; j < locked_door_count; j ++) {
             if (locked[j].x == x && locked[j].y == y) {
                 if (locked[j].state == 0) return 2;
@@ -1208,6 +1280,34 @@ void desplay_gold () {
     refresh();
 }
 
+void monster_move (int px, int py, struct monster * m) {
+    
+    int my = m->y;
+    int mx = m->x;
+
+    map[my][mx] = '.';
+    int nx = mx;
+    int ny = my;
+    
+    if (mx < px && mx + 1 < WIDTH && map[my][mx + 1] == '.') {
+        nx++;
+    } else if (mx > px && mx - 1 >= 0 && map[my][mx - 1] == '.') {
+        nx--;
+    } else if (my < py && my + 1 < HEIGHT && map[my + 1][mx] == '.') {
+        ny++;
+    } else if (my > py && my - 1 >= 0 && map[my - 1][mx] == '.') {
+        ny--;
+    }
+    
+    mx = nx;
+    my = ny;
+    
+    m->y = my;
+    m->x = mx;
+    map[my][mx] = m->type;
+    render_map();
+
+}
 int monster_check (int x, int y, struct monster monster) {
     if ((monster.x == x + 1 || monster.x == x - 1) && (monster.x == y + 1 || monster.y == y - 1)) {
         return 1;
@@ -1780,13 +1880,14 @@ void generate_map (){
             add_gold(new_room);
             add_weapon(new_room);
             add_potion(new_room);
+            if (new_room.type != 1) add_monster(new_room);
             
             if (room_count > 0) {
                 corridor(
-                         rooms[level][room_count[level] - 1].x + 1 + (rooms[level][room_count[level] - 1].width - 2) / 2,
-                    rooms[level][room_count[level] - 1].y + 1 + (rooms[level][room_count[level] - 1].height - 2) / 2,
-                    new_room.x + 1 + (new_room.width - 2) / 2,
-                    new_room.y + 1 + (new_room.height - 2) / 2
+                         rooms[level][room_count[level] - 1].x + (rooms[level][room_count[level] - 1].width - 2) / 2,
+                    rooms[level][room_count[level] - 1].y + (rooms[level][room_count[level] - 1].height - 2) / 2,
+                    new_room.x + (new_room.width - 2) / 2,
+                    new_room.y + (new_room.height - 2) / 2
                 );
 
                 door_fix(new_room);
@@ -1827,6 +1928,7 @@ void generate_map (){
         desplay_gold();
         render_map();
         init_colors();
+        //player_in_room(px, py, rooms[level], room_count[level]);
         if (hero_color == 1) attron(COLOR_WHITE);
         else attron(COLOR_PAIR(hero_color));
         mvaddch(py, px, '@');
@@ -2008,6 +2110,11 @@ void generate_map (){
             }
             px = nx;
             py = ny;
+            
+            struct ROOM room_p = which_room(px, py);
+            if (room_p.x != -1 && room_p.y != -1) {
+                while_inside_room(px, py, room_p);
+            }
         }
         
         
