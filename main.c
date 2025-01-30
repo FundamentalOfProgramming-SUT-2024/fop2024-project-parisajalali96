@@ -167,6 +167,7 @@ void health_bar (int);
 void monster_move (int, int, struct monster *);
 void render_map();
 int monster_check (int , int , struct monster );
+void monster_attack (struct monster );
 //prototypes
 void pick_one (int highlight, char* menu_name, char * options[], int n) {
     attron(COLOR_PAIR(1));
@@ -290,6 +291,29 @@ void messages(char *what_happened, int maybe) {
             attron(COLOR_PAIR(2));
             printw("The Undeed damages you greatly!");
             attroff(COLOR_PAIR(2));
+        }
+    } else if (strcmp(what_happened, "monster dead") == 0) {
+        int type = monsters[maybe].type;
+        if (type == 0) {
+            attron(COLOR_PAIR(9));
+            printw("You beat The Deamon!");
+            attroff(COLOR_PAIR(9));
+        } else if (type == 1) {
+            attron(COLOR_PAIR(9));
+            printw("The Fire Breathing Monster hisses as it's flames die out!");
+            attroff(COLOR_PAIR(9));
+        } else if (type == 2) {
+            attron(COLOR_PAIR(9));
+            printw("You defeat The Giant!");
+            attroff(COLOR_PAIR(9));
+        } else if (type == 3) {
+            attron(COLOR_PAIR(9));
+            printw("The Snake falls by you weapon!");
+            attroff(COLOR_PAIR(9));
+        } else if (type == 4) {
+            attron(COLOR_PAIR(9));
+            printw("The Undeed collapses into a pile of bones!");
+            attroff(COLOR_PAIR(9));
         }
     }
 
@@ -529,19 +553,32 @@ void add_monster (struct ROOM room) {
         for (int x = room.x; x < room.x + room.width; x++) {
             int type = rand () % 10;
             char symbol = 'D';
-            if (type == 0 || type == 2 || type == 3) symbol = 'D';//D
-            else if (type == 4 || type == 5) symbol = 'F';//F
-            else if (type == 6 || type == 7) symbol = 'G';//G
-            else if (type == 8) symbol = 'S'; //S
-            else if (type == 9) symbol = 'U'; //U
-           // if (traps_count >= max) break;
+            if (type == 0 || type == 2 || type == 3) {
+                symbol = 'D';//D
+                monsters[monster_count].health = 5;
+            }
+            else if (type == 4 || type == 5) {
+                symbol = 'F';//F
+                monsters[monster_count].health = 10;
+            }
+            else if (type == 6 || type == 7) {
+                symbol = 'G';//G
+                monsters[monster_count].health = 15;
+            }
+            else if (type == 8) {
+                symbol = 'S'; //S
+                monsters[monster_count].health = 20;
+            }
+            else if (type == 9) {
+                symbol = 'U'; //U
+                monsters[monster_count].health = 30;
+            }
             if (rand () % prob == 0 && map[y][x] == '.') {
                 monsters[monster_count].x = x;
                 monsters[monster_count].y = y;
                 monsters[monster_count].type = symbol;
                 map[y][x] = symbol;
                 monsters[monster_count].state = 0;
-                monsters[monster_count].health = 100;
                 monster_count++;
             }
         }
@@ -1092,6 +1129,27 @@ void reveal_room(struct ROOM room) {
     
 }
 
+void monster_health_check (struct monster monster) {
+    if (monster.health <= 0) monster.state = 1;
+    else monster.state = 0;
+}
+
+void player_attack (int mx, int my) {
+    struct monster monster;
+    int index;
+    for (int i = 0; i < monster_count; i ++) {
+        if (monsters[i].x == mx && monsters[i].y == my) {
+            index = i;
+            monster = monsters[i];
+            monster.health -= 5;
+            monster_health_check(monster);
+            if (monster.state) {
+                messages("monster dead", i);
+            }
+            else messages("player attack", i);
+        }
+    }
+}
 struct ROOM which_room (int px, int py) {
     struct ROOM room;
     room.x = -1;
@@ -1111,7 +1169,8 @@ void while_inside_room (int px, int py, struct ROOM room) {
             if (monsters[i].type == 'G' || monsters[i].type == 'S' || monsters[i].type == 'U') {
                 monster_move(px, py, &monsters[i]);
             }
-            monster_check(px, py, monsters[i]);
+            if (monster_check(px, py, monsters[i])) monster_attack(monsters[i]);
+
         }
     }
     //render_map();
@@ -1309,7 +1368,7 @@ void monster_move (int px, int py, struct monster * m) {
 
 }
 int monster_check (int x, int y, struct monster monster) {
-    if ((monster.x == x + 1 || monster.x == x - 1) && (monster.x == y + 1 || monster.y == y - 1)) {
+    if ((monster.x == x + 1 || monster.x == x - 1) && ( monster.x == y + 1 || monster.y == y - 1)) {
         return 1;
     } else return 0;
 }
@@ -2047,6 +2106,16 @@ void generate_map (){
                     py = ny;
                 }
             }
+        } else if (map[ny][nx] == 'D' || map[ny][nx] == 'F' || map[ny][nx] == 'G' || map[ny][nx] == 'S' || map[ny][nx] == 'U') {
+            int attack = getch();
+            if (attack == ' ') player_attack(nx, ny);
+            
+            for (int i = 0; i < monster_count; i ++) {
+                if (monsters[i].x == nx && monsters[i].y == ny) {
+                    if (monsters[i].state == 1) map[ny][nx] = '.';
+                }
+            }
+            
         } else if (map[ny][nx] == '&') {
             show_password(nx, ny);
         } else if (map[ny][nx] == '*') {
