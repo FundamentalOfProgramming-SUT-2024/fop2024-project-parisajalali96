@@ -14,10 +14,10 @@
 
 
 #define MAX_SIZE 100
-#define HEIGHT 25
-#define WIDTH 50
-#define ROOM_MIN_SIZE 4
-#define ROOM_MAX_SIZE 10
+#define HEIGHT 30
+#define WIDTH 100
+#define ROOM_MIN_SIZE 5
+#define ROOM_MAX_SIZE 13
 #define ROOM_COUNT 6
 #define CORRIDOR_VISIBLE 1
 #define MAX_PILLAR 3
@@ -27,6 +27,7 @@
 #define PASS_TIMEOUT 10
 #define MAX_HEALTH 100
 #define HEALTH_R 1
+#define HUNGER_R 5
 #define HEALTH_TIME 20
 #define MAX_GOLD 1000
 //403170933
@@ -130,6 +131,7 @@ bool first_key [5] = {true};
 bool master_keys_broken [5] = {false};
 
 int health = 100;
+int hunger = 100;
 struct food foods [100];
 int food_count = 0;
 
@@ -137,6 +139,8 @@ struct picked_up pocket [100];
 int pocket_count;
 
 time_t last_health_update = 0;
+time_t last_hunger_update = 0;
+
 
 struct picked_up_food pocket_food [9];
 struct gold golds[MAX_FOOD];
@@ -203,7 +207,7 @@ void messages(char *what_happened, int maybe) {
         attroff(COLOR_PAIR(5));
     } else if (strcmp(what_happened, "cheat code M") == 0) {
         attron(COLOR_PAIR(5));
-        printw("You have entered full map mode. Press any key to continue.");
+        printw("You have entered full map mode.");
         attroff(COLOR_PAIR(5));
     } else if (strcmp(what_happened, "trap around") == 0) {
         attron(COLOR_PAIR(2));
@@ -315,13 +319,38 @@ void messages(char *what_happened, int maybe) {
             printw("The Undeed collapses into a pile of bones!");
             attroff(COLOR_PAIR(9));
         }
+    } else if (strcmp(what_happened, "player attack") == 0) {
+        int type = monsters[maybe].type;
+        if (type == 0) {
+            attron(COLOR_PAIR(9));
+            printw("You strike The Deamon!");
+            attroff(COLOR_PAIR(9));
+        } else if (type == 1) {
+            attron(COLOR_PAIR(9));
+            printw("You hit the Fire Breathing Monster!");
+            attroff(COLOR_PAIR(9));
+        } else if (type == 2) {
+            attron(COLOR_PAIR(9));
+            printw("You do a great number on The Giant!");
+            attroff(COLOR_PAIR(9));
+        } else if (type == 3) {
+            attron(COLOR_PAIR(9));
+            printw("You attack the snake!");
+            attroff(COLOR_PAIR(9));
+        } else if (type == 4) {
+            attron(COLOR_PAIR(9));
+            printw("You attack the Undeed!");
+            attroff(COLOR_PAIR(9));
+        }
+    } else if (strcmp(what_happened, "low health") == 0) {
+        attron(COLOR_PAIR(9));
+        printw("Your vision's blurry. Eat something!");
+        attroff(COLOR_PAIR(9));
     }
 
     refresh();
     getch();
 }
-
-
 
 void difficulty () {
     int ch;
@@ -1143,10 +1172,11 @@ void player_attack (int mx, int my) {
             monster = monsters[i];
             monster.health -= 5;
             monster_health_check(monster);
+            messages("player attack", i);
             if (monster.state) {
+                map[my][mx] = '.';
                 messages("monster dead", i);
             }
-            else messages("player attack", i);
         }
     }
 }
@@ -1310,11 +1340,32 @@ char * food_name (int color) {
     }
 }
 
+void hunger_update () {
+    time_t current_time;
+    time(&current_time);
+
+    if (difftime(current_time, last_hunger_update) >= HEALTH_TIME ) {
+        hunger -= HUNGER_R;
+        
+        if (hunger < 0) {
+            hunger = 0;
+        }
+        last_hunger_update = current_time;
+    }
+}
+
 void health_update () {
     time_t current_time;
     time(&current_time);
 
-    if (difftime(current_time, last_health_update) >= HEALTH_TIME) {
+    if (difftime(current_time, last_health_update) >= HEALTH_TIME && hunger >= 80) {
+        health += HEALTH_R;
+        
+        if (health < 0) {
+            health = 0;
+        }
+        last_health_update = current_time;
+    } else if (difftime(current_time, last_health_update) >= HEALTH_TIME && hunger < 80) {
         health -= HEALTH_R;
         
         if (health < 0) {
@@ -1334,7 +1385,7 @@ void show_level () {
 
 void desplay_gold () {
     attron(COLOR_PAIR(5));
-    mvprintw(LINES -1, COLS/2, "Gold: %d", gold);
+    mvprintw(LINES -1, COLS/2 + 12, "Gold: %d", gold);
     attroff(COLOR_PAIR(5));
     refresh();
 }
@@ -1367,6 +1418,18 @@ void monster_move (int px, int py, struct monster * m) {
     render_map();
 
 }
+struct monster monster_in_room (int px, int py ) {
+    struct monster monster;
+    monster.x = -1;
+    monster.y = -1;
+
+    for ( int i = 0; i < monster_count; i ++) {
+        if ((monsters[i].x == px + 1 || monsters[i].x == px - 1) && ( monsters[i].x == py + 1 || monsters[i].y == py - 1)) {
+            return monsters[i];
+        }
+    }
+    return monster;
+}
 int monster_check (int x, int y, struct monster monster) {
     if ((monster.x == x + 1 || monster.x == x - 1) && ( monster.x == y + 1 || monster.y == y - 1)) {
         return 1;
@@ -1397,9 +1460,44 @@ void monster_attack (struct monster monster)  {
     }
 
 }
+void hunger_bar (int hunger) {
+    if (hunger > 100) hunger = 100;
+    if (hunger <= 0) end_game('l');
+    //if (health > 0 && health <= 50) messages("low health", 0);
+    int filled = (hunger * 20) / MAX_HEALTH;
+    move(LINES - 1, COLS - 20 - 10 - 54);
+    addch('[');
+    for (int i = 0; i < 20; i++) {
+        if (i < filled) {
+            attron(COLOR_PAIR(2));
+            addch('#');
+            attroff(COLOR_PAIR(2));
+            //refresh();
+            
+        } else {
+            attron(COLOR_PAIR(2));
+            addch('-');
+            attroff(COLOR_PAIR(2));
+            //refresh();
+        }
+    }
+    addch(']');
+    char state [10];
+    mvprintw(LINES -1, COLS - 39 - 54 , "Hunger: ");
+    if (hunger <= 100 && hunger > 80) strcpy(state, "Full");
+    else if (hunger <= 80 && hunger > 60) strcpy(state, "Satisfied");
+    else if (hunger <= 60 && hunger > 40) strcpy(state, "Hungry");
+    else if (hunger <= 40 && hunger > 20) strcpy(state, "Starving");
+    else if (hunger <= 20 && hunger > 0) strcpy(state, "Dying");
+
+    mvprintw(LINES - 1,COLS -8 - 52, "%s", state);
+    refresh();
+
+}
 void health_bar (int health) {
     if (health > 100) health = 100;
     if (health <= 0) end_game('l');
+    if (health > 0 && health <= 50) messages("low health", 0);
     int filled = (health * 20) / MAX_HEALTH;
     move(LINES - 1, COLS - 20 - 10);
     addch('[');
@@ -1419,7 +1517,7 @@ void health_bar (int health) {
     }
     addch(']');
     mvprintw(LINES -1, COLS - 39, "Health: ");
-    mvprintw(LINES - 1, COLS - 20 - 10 + 20 + 2, "%d%%", (health * 100) / MAX_HEALTH);
+    mvprintw(LINES - 1, COLS -8, "%d%%", (health * 100) / MAX_HEALTH);
     refresh();
 
 }
@@ -1429,7 +1527,9 @@ void food_choice (char * name ) {
         if (strcmp(foods[i].name, name) == 0 && foods[i].state == 0) {
             foods[i].state =1;
             health += 5;
+            hunger += 5;
             health_bar(health);
+            hunger_bar(hunger);
             break;
         }
     }
@@ -1941,7 +2041,7 @@ void generate_map (){
             add_potion(new_room);
             if (new_room.type != 1) add_monster(new_room);
             
-            if (room_count > 0) {
+            if (room_count[level] > 0) {
                 corridor(
                          rooms[level][room_count[level] - 1].x + (rooms[level][room_count[level] - 1].width - 2) / 2,
                     rooms[level][room_count[level] - 1].y + (rooms[level][room_count[level] - 1].height - 2) / 2,
@@ -1982,7 +2082,10 @@ void generate_map (){
         curs_set(0);
        // clear();
         refresh();
+        cbreak();
+        noecho();
         health_bar(health);
+        hunger_bar(hunger);
         show_level();
         desplay_gold();
         render_map();
@@ -2030,6 +2133,9 @@ void generate_map (){
             p_command();
         } else if (ch == 'g') {
             cheat_g();
+        } else if (ch == ' ') {
+            struct monster mon = monster_in_room(px, py);
+            player_attack(mon.x, mon.y);
         }
         else if (ch == 'f') {
             int condition [2] = {0};
@@ -2106,7 +2212,7 @@ void generate_map (){
                     py = ny;
                 }
             }
-        } else if (map[ny][nx] == 'D' || map[ny][nx] == 'F' || map[ny][nx] == 'G' || map[ny][nx] == 'S' || map[ny][nx] == 'U') {
+        /*} else if (map[ny][nx] == 'D' || map[ny][nx] == 'F' || map[ny][nx] == 'G' || map[ny][nx] == 'S' || map[ny][nx] == 'U') {
             int attack = getch();
             if (attack == ' ') player_attack(nx, ny);
             
@@ -2115,7 +2221,7 @@ void generate_map (){
                     if (monsters[i].state == 1) map[ny][nx] = '.';
                 }
             }
-            
+            */
         } else if (map[ny][nx] == '&') {
             show_password(nx, ny);
         } else if (map[ny][nx] == '*') {
@@ -2188,6 +2294,7 @@ void generate_map (){
         
         
         health_update();
+        hunger_update();
         refresh();
     }
     
