@@ -88,6 +88,7 @@ struct weapon {
     int x, y;
     char symbol;
     int state;
+    int num_collect;
 };
 
 struct potion {
@@ -1235,6 +1236,8 @@ void player_attack (int mx, int my, char type) {
             if (monsters[i].state) {
                 map[my][mx] = '.';
                 messages("monster dead", i);
+                weapon_in_hand->num_collect--;
+                if (weapon_in_hand->num_collect == 0) weapon_in_hand->state = -1;
                 hits ++;
                 display_hits();
             }
@@ -1450,6 +1453,8 @@ void drop_weapon (int x, int y, struct weapon * weapon) {
     weapon->y = y;
     weapon->state = 0;
     map[y][x] = weapon->symbol;
+    weapon->num_collect--;
+    if (weapon->num_collect == 0) weapon->state = -1;
 }
 void dagger_wand_attack (int px, int py, char * direction, int type) {
     int distance;
@@ -1789,10 +1794,10 @@ void weapon_window () {
     int dag = 0, wand = 0, arrow = 0, sword = 0;
     for ( int i = 0; i < weapon_count; i ++) {
         //if (weapons[i].symbol == 'm' && weapons[i].state == 0) mace++;
-        if (weapons[i].symbol == 'd' && weapons[i].state != -1) dag++;
-        if (weapons[i].symbol == '~' && weapons[i].state != -1) wand++;
-        if (weapons[i].symbol == 'a' && weapons[i].state != -1) arrow++;
-        if (weapons[i].symbol == '!' && weapons[i].state != -1) sword++;
+        if (weapons[i].symbol == 'd' && weapons[i].state != -1) dag += weapons[i].num_collect;
+        if (weapons[i].symbol == '~' && weapons[i].state != -1) wand+= weapons[i].num_collect;
+        if (weapons[i].symbol == 'a' && weapons[i].state != -1) arrow+= weapons[i].num_collect;
+        if (weapons[i].symbol == '!' && weapons[i].state != -1) sword+= weapons[i].num_collect;
     }
     
     
@@ -1948,21 +1953,30 @@ void add_weapon (struct ROOM room) {
             if (rand () % 50 == 0 && map[y][x] == '.') {
                 int type = rand() % 4;
                 char symbol;
+                int num;
                if (type == 0) {
                     symbol = 'd';
+                   num = 10;
                 } else if (type == 1) {
                     symbol = '~';
+                    num = 8;
                 } else if (type == 2) {
                     symbol = 'a';
+                    num = 20;
                 } else {
                     symbol = '!';
+                    num = 1;
                 }
-                if (weapon_count == 0) symbol = 'm';
+                if (weapon_count == 0) {
+                    symbol = 'm';
+                    num = 1;
+                }
                 weapons[weapon_count].symbol = symbol;
                 if (weapon_count) map[y][x] = symbol;
                 weapons[weapon_count].x = x;
                 weapons[weapon_count].y = y;
                 weapons[weapon_count].state = -1;
+                weapons[weapon_count].num_collect = num;
                 weapon_count++;
             }
         }
