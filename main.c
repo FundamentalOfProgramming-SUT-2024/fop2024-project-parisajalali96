@@ -99,6 +99,7 @@ struct monster {
     int x, y;
     int health;
     char type;
+    int num;
     int state;
 };
 // structs
@@ -146,7 +147,7 @@ struct picked_up_food pocket_food [9];
 struct gold golds[MAX_FOOD];
 int gold_count = 0;
 int gold = 100;
-int score = 0;
+int score = 100;
 
 struct weapon weapons[50];
 int weapon_count = 0;
@@ -159,6 +160,8 @@ int g_state = 0;
 
 struct monster monsters[40];
 int monster_count = 0;
+
+char user_name [30] = "Guest_Player";
 //global stuff
 
 void generate_map ();
@@ -172,6 +175,11 @@ void monster_move (int, int, struct monster *);
 void render_map();
 int monster_check (int , int , struct monster );
 void monster_attack (struct monster );
+void get_score (char*, int , int );
+void play_menu ();
+void load_hall();
+void hall_of_fame();
+
 //prototypes
 void pick_one (int highlight, char* menu_name, char * options[], int n) {
     attron(COLOR_PAIR(1));
@@ -297,7 +305,7 @@ void messages(char *what_happened, int maybe) {
             attroff(COLOR_PAIR(2));
         }
     } else if (strcmp(what_happened, "monster dead") == 0) {
-        int type = monsters[maybe].type;
+        int type = monsters[maybe].num;
         if (type == 0) {
             attron(COLOR_PAIR(9));
             printw("You beat The Deamon!");
@@ -320,7 +328,7 @@ void messages(char *what_happened, int maybe) {
             attroff(COLOR_PAIR(9));
         }
     } else if (strcmp(what_happened, "player attack") == 0) {
-        int type = monsters[maybe].type;
+        int type = monsters[maybe].num;
         if (type == 0) {
             attron(COLOR_PAIR(9));
             printw("You strike The Deamon!");
@@ -346,6 +354,8 @@ void messages(char *what_happened, int maybe) {
         attron(COLOR_PAIR(9));
         printw("Your vision's blurry. Eat something!");
         attroff(COLOR_PAIR(9));
+    } else if (strcmp(what_happened, "no monster") == 0) {
+        printw("There are no monsters around you.");
     }
 
     refresh();
@@ -585,22 +595,30 @@ void add_monster (struct ROOM room) {
             if (type == 0 || type == 2 || type == 3) {
                 symbol = 'D';//D
                 monsters[monster_count].health = 5;
+                monsters[monster_count].num = 0;
+
             }
             else if (type == 4 || type == 5) {
                 symbol = 'F';//F
                 monsters[monster_count].health = 10;
+                monsters[monster_count].num = 1;
+
             }
             else if (type == 6 || type == 7) {
                 symbol = 'G';//G
                 monsters[monster_count].health = 15;
+                monsters[monster_count].num = 2;
+
             }
             else if (type == 8) {
                 symbol = 'S'; //S
                 monsters[monster_count].health = 20;
+                monsters[monster_count].num = 3;
             }
             else if (type == 9) {
                 symbol = 'U'; //U
                 monsters[monster_count].health = 30;
+                monsters[monster_count].num = 4;
             }
             if (rand () % prob == 0 && map[y][x] == '.') {
                 monsters[monster_count].x = x;
@@ -1158,28 +1176,25 @@ void reveal_room(struct ROOM room) {
     
 }
 
-void monster_health_check (struct monster monster) {
-    if (monster.health <= 0) monster.state = 1;
-    else monster.state = 0;
+void monster_health_check (struct monster * monster) {
+    if (monster->health <= 0) monster->state = 1;
+    else monster->state = 0;
 }
 
 void player_attack (int mx, int my) {
-    struct monster monster;
-    int index;
     for (int i = 0; i < monster_count; i ++) {
         if (monsters[i].x == mx && monsters[i].y == my) {
-            index = i;
-            monster = monsters[i];
-            monster.health -= 5;
-            monster_health_check(monster);
+            monsters[i].health -= 5;
+            monster_health_check(&monsters[i]);
             messages("player attack", i);
-            if (monster.state) {
+            if (monsters[i].state) {
                 map[my][mx] = '.';
                 messages("monster dead", i);
             }
         }
     }
 }
+
 struct ROOM which_room (int px, int py) {
     struct ROOM room;
     room.x = -1;
@@ -1195,7 +1210,7 @@ struct ROOM which_room (int px, int py) {
 void while_inside_room (int px, int py, struct ROOM room) {
     
     for ( int i = 0; i < monster_count; i ++) {
-        if ((monsters[i].x >= room.x && monsters[i].x <= room.x + room.width) && (monsters[i].y >= room.y && monsters[i].y <= room.y + room.height) && room.type != 1) {
+        if (monsters[i].state == 0 && (monsters[i].x >= room.x && monsters[i].x <= room.x + room.width) && (monsters[i].y >= room.y && monsters[i].y <= room.y + room.height) && room.type != 1) {
             if (monsters[i].type == 'G' || monsters[i].type == 'S' || monsters[i].type == 'U') {
                 monster_move(px, py, &monsters[i]);
             }
@@ -1390,15 +1405,13 @@ void desplay_gold () {
     refresh();
 }
 
-void monster_move (int px, int py, struct monster * m) {
-    
+void monster_move(int px, int py, struct monster *m) {
     int my = m->y;
     int mx = m->x;
 
-    map[my][mx] = '.';
     int nx = mx;
     int ny = my;
-    
+
     if (mx < px && mx + 1 < WIDTH && map[my][mx + 1] == '.') {
         nx++;
     } else if (mx > px && mx - 1 >= 0 && map[my][mx - 1] == '.') {
@@ -1408,30 +1421,36 @@ void monster_move (int px, int py, struct monster * m) {
     } else if (my > py && my - 1 >= 0 && map[my - 1][mx] == '.') {
         ny--;
     }
-    
-    mx = nx;
-    my = ny;
-    
-    m->y = my;
-    m->x = mx;
-    map[my][mx] = m->type;
-    render_map();
 
+    if (nx == px && ny == py) {
+        monster_attack(*m);
+        return;
+    }
+
+    if (nx != mx || ny != my) {
+        map[my][mx] = '.';
+        m->x = nx;
+        m->y = ny;
+        map[ny][nx] = m->type;
+    }
+    
+    render_map();
 }
+
 struct monster monster_in_room (int px, int py ) {
     struct monster monster;
     monster.x = -1;
     monster.y = -1;
 
     for ( int i = 0; i < monster_count; i ++) {
-        if ((monsters[i].x == px + 1 || monsters[i].x == px - 1) && ( monsters[i].x == py + 1 || monsters[i].y == py - 1)) {
+        if ((monsters[i].x == px || monsters[i].x == px + 1 || monsters[i].x == px - 1) && ( monsters[i].y == py || monsters[i].y == py + 1 || monsters[i].y == py - 1)) {
             return monsters[i];
         }
     }
     return monster;
 }
 int monster_check (int x, int y, struct monster monster) {
-    if ((monster.x == x + 1 || monster.x == x - 1) && ( monster.x == y + 1 || monster.y == y - 1)) {
+    if (monster.state == 0 && (monster.x == x || monster.x == x + 1 || monster.x == x - 1) && ( monster.y == y || monster.y == y + 1 || monster.y == y - 1)) {
         return 1;
     } else return 0;
 }
@@ -1490,14 +1509,14 @@ void hunger_bar (int hunger) {
     else if (hunger <= 40 && hunger > 20) strcpy(state, "Starving");
     else if (hunger <= 20 && hunger > 0) strcpy(state, "Dying");
 
-    mvprintw(LINES - 1,COLS -8 - 52, "%s", state);
+    mvprintw(LINES - 1,COLS -8 - 54, "%s", state);
     refresh();
 
 }
 void health_bar (int health) {
     if (health > 100) health = 100;
     if (health <= 0) end_game('l');
-    if (health > 0 && health <= 50) messages("low health", 0);
+    //if (health > 0 && health <= 50) messages("low health", 0);
     int filled = (health * 20) / MAX_HEALTH;
     move(LINES - 1, COLS - 20 - 10);
     addch('[');
@@ -1979,10 +1998,14 @@ void end_game (char state) {
         mvwprintw(winner, 2, (50 - strlen(msg)) / 2, "%s", msg);
         mvwprintw(winner, 4, 2, "%s", "With the treasure in your hands and the dungeon");
         mvwprintw(winner, 5, 2, "%s", "fading behind, you emerge victorious at last!");
-        
+        mvprintw(7, 2, "Press any key to enter Hall of Fame!");
         wrefresh(winner);
         getch();
         delwin(winner);
+        get_score(user_name, score, gold);
+        load_hall();
+        hall_of_fame();
+        
     } else {
         clear();
         refresh();
@@ -1997,10 +2020,14 @@ void end_game (char state) {
         mvwprintw(loser, 2, (50 - strlen(msg)) / 2, "%s", msg);
         mvwprintw(loser, 4, 2, "%s", "Darkness consumes you as you fall...");
         mvwprintw(loser, 5, 2, "%s", "The dungeon claims another soul.");
+        mvprintw(7, 2, "Press any key to enter Hall of Fame!");
         
         wrefresh(loser);
         getch();
         delwin(loser);
+        get_score(user_name, score, gold);
+        load_hall();
+        hall_of_fame();
     }
 }
 void cheat_g () {
@@ -2135,7 +2162,8 @@ void generate_map (){
             cheat_g();
         } else if (ch == ' ') {
             struct monster mon = monster_in_room(px, py);
-            player_attack(mon.x, mon.y);
+            if (mon.x != -1 && mon.y != -1 && mon.state == 0) player_attack(mon.x, mon.y);
+            else messages("no monster", 0);
         }
         else if (ch == 'f') {
             int condition [2] = {0};
@@ -2369,6 +2397,7 @@ void start_game_menu () {
                 getch();
                 refresh();
             } else if (choice == 3) {// Exit
+                play_menu();
                 getch();
                 refresh();
             }
@@ -2518,7 +2547,7 @@ void play_menu () {
             } else if (choice == 1) { // Login
                 clear();
                 get_info("Enter username: ", username, 50, 0);
-
+                strcpy(user_name, username);
                 get_info("Enter password: ", password, 50, 1);
                 
                 if (validate_username(username, password)) {
@@ -2584,10 +2613,10 @@ void play_menu () {
 
 void load_hall () {
     FILE * file = fopen("hall_of_fame.txt", "r");
-    if(!file) return;
+    //if(!file) return;
     
     score_count = 0;
-    while(fscanf(file, "%s %d %d %d %ld", ranks[score_count].name, &ranks[score_count].total_score, &ranks[score_count].total_gold, &ranks[score_count].total_games, &ranks[score_count].lastgame) == 5 ) {
+    while(fscanf(file, "%s %d %d %d", ranks[score_count].name, &ranks[score_count].total_score, &ranks[score_count].total_gold, &ranks[score_count].total_games)) {
         score_count++;
     }
     fclose(file);
@@ -2595,23 +2624,23 @@ void load_hall () {
 
 void save_scores () {
     FILE * file = fopen("hall_of_fame.txt", "w");
-    if (!file) return;
+    //if (!file) return;
     
     for ( int i = 0; i < score_count; i ++) {
-        fprintf(file , "%s %d %d %d %ld", ranks[i].name, ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games, ranks[i].lastgame);
+        fprintf(file , "%s %d %d %d\n", ranks[i].name, ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games);
     }
     fclose(file);
 }
 
 void get_score (char* name, int score, int gold) {
-    time_t current_time = time(NULL);
+    //time_t current_time = time(NULL);
     int found = 0;
     for ( int i = 0; i < score_count; i ++) {
         if (strcmp(ranks[i].name, name)== 0) {
             ranks[i].total_score += score;
             ranks[i].total_gold += gold;
             ranks[i].total_games ++;
-            ranks[i].lastgame = current_time;
+            //ranks[i].lastgame = current_time;
             found = 1;
             break;
         }
@@ -2622,28 +2651,67 @@ void get_score (char* name, int score, int gold) {
         ranks[score_count].total_score = score;
         ranks[score_count].total_gold = gold;
         ranks[score_count].total_games = 1;
-        ranks[score_count].lastgame = current_time;
+       // ranks[score_count].lastgame = current_time;
         score_count ++;
     }
     
+    save_scores();
+    
 }
 
-void hall_of_fame () {
+
+int compare_scores(const void *a, const void *b) {
+    return ((struct scores*)b)->total_score - ((struct scores*)a)->total_score;
+}
+
+void hall_of_fame() {
+    //printw("%d", score_count);
+
+    //load_hall();
+    qsort(ranks, score_count, sizeof(struct scores), compare_scores);
+
     printw("HALL OF FAME\n");
+    attron(COLOR_PAIR(5));
     printw("Rank Name      Score  Gold  Games Played  Experience\n");
-    
-    for ( int i = 0; i < score_count; i ++) {
-        char time [20];
+    attroff(COLOR_PAIR(5));
+    printw("%d", score_count);
+    for (int i = 0; i < score_count; i++) {
+        char time[20];
         struct tm *tm_info = localtime(&ranks[i].lastgame);
         strftime(time, 20, "%Y-%m-%d", tm_info);
-        
-        printw("%2d   %-10s %5d %5d %5d %s", i + 1, ranks[i].name,
-               ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games, time);
+        int color;
+        if (i == 0) color = 5;
+        else if (i == 1) color = 6;
+        else if (i == 2) color = 4;
+        else color = 10;
+        if (i == 0) {
+            attron(COLOR_PAIR(color));
+            printw("* %d.   %s %d %d %d", i + 1, ranks[i].name,
+                   ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games);
+            attroff(COLOR_PAIR(color));
+        } else if (i == 1) {
+            attron(COLOR_PAIR(color));
+            printw("** %d.   %s %d %d %d", i + 1, ranks[i].name,
+                   ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games);
+            attroff(COLOR_PAIR(color));
+        } else if (i == 2) {
+            attron(COLOR_PAIR(color));
+            printw("*** %d.   %s %d %d %d", i + 1, ranks[i].name,
+                   ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games);
+            attroff(COLOR_PAIR(color));
+        } else {
+            attron(COLOR_PAIR(color));
+            printw("%d.   %s %d %d %d", i + 1, ranks[i].name,
+                   ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games);
+            attroff(COLOR_PAIR(color));
+        }
     }
-    printw("Press any key to exit.");
+    
+
     refresh();
     getch();
 }
+
 
 void main_menu (){
     char username[50], password[50], email[50];
@@ -2683,32 +2751,33 @@ void load_welcome_page() {
     int start_x = 0;
 
     attron(COLOR_PAIR(2));
-    int x = 10;
-    mvprintw(start_y + 1 + x, start_x + 8 +x, "                           /   \\");
-    mvprintw(start_y + 2 +x, start_x + 8 +x, "_                  )      ((   ))     (");
-    mvprintw(start_y + 3 +x, start_x + 8 +x, "(@)               /|\\      ))_((     /|\\                   _");
-    mvprintw(start_y + 4 +x, start_x + 8 +x, "|-|`\\            / | \\    (/\\|/\\)   / | \\                (@)");
-    mvprintw(start_y + 5 +x, start_x + 8 +x, "| |-------------/--|-voV---\\`|'/--Vov-|--\\--------------|-|");
-    mvprintw(start_y + 6 +x, start_x + 8 +x, "|-|                '^`     (o o)     '^`                  | |");
-    mvprintw(start_y + 7 +x, start_x + 8 +x, "| |                        `\\Y/'                         |-|");
-    mvprintw(start_y + 8 +x, start_x + 8 +x, "|-|                                                       | |");
-    mvprintw(start_y + 9 +x, start_x + 8 +x, "| |                                                       |-|");
-    mvprintw(start_y + 10 +x, start_x + 8 +x,"|_|_______________________________________________________| |");
-    mvprintw(start_y + 11 +x, start_x + 8 +x, "(@)       l   /\\ /         ( (       \\ /\\   l         `\\|-|");
-    mvprintw(start_y + 12 +x, start_x + 8 +x, "         l /   V           \\ \\        V  \\ l            (@)");
-    mvprintw(start_y + 13 +x, start_x + 8 +x, "         l/                _) )_           \\I");
-    mvprintw(start_y + 14 +x, start_x + 8 +x, "                          `\\ /'");
-    mvprintw(start_y + 15 +x, start_x + 8 +x, "                             `");
+    int x = 25;
+    int y = 10;
+    mvprintw(start_y + 1 + y, start_x + 8 +x, "                           /   \\");
+    mvprintw(start_y + 2 + y, start_x + 8 +x, "_                  )      ((   ))     (");
+    mvprintw(start_y + 3 + y, start_x + 8 +x, "(@)               /|\\      ))_((     /|\\                   _");
+    mvprintw(start_y + 4 + y, start_x + 8 +x, "|-|`\\            / | \\    (/\\|/\\)   / | \\                (@)");
+    mvprintw(start_y + 5 + y, start_x + 8 +x, "| |-------------/--|-voV---\\`|'/--Vov-|--\\--------------|-|");
+    mvprintw(start_y + 6 + y, start_x + 8 +x, "|-|                '^`     (o o)     '^`                  | |");
+    mvprintw(start_y + 7 + y, start_x + 8 +x, "| |                        `\\Y/'                         |-|");
+    mvprintw(start_y + 8 + y, start_x + 8 +x, "|-|                                                       | |");
+    mvprintw(start_y + 9 + y, start_x + 8 +x, "| |                                                       |-|");
+    mvprintw(start_y + 10 + y, start_x + 8 +x,"|_|_______________________________________________________| |");
+    mvprintw(start_y + 11 + y, start_x + 8 +x, "(@)       l   /\\ /         ( (       \\ /\\   l         `\\|-|");
+    mvprintw(start_y + 12 + y, start_x + 8 +x, "         l /   V           \\ \\        V  \\ l            (@)");
+    mvprintw(start_y + 13 + y, start_x + 8 +x, "         l/                _) )_           \\I");
+    mvprintw(start_y + 14 + y, start_x + 8 +x, "                          `\\ /'");
+    mvprintw(start_y + 15 + y, start_x + 8 +x, "                             `");
     attroff(COLOR_PAIR(2));
     refresh();
     
-    attron(COLOR_PAIR(8));
+    attron(COLOR_PAIR(5));
     char welcome[] = "Welcome to the Dungeon of Doom!";
     int welcome_len = strlen(welcome);
     int start = (width - welcome_len) / 2;
-    mvprintw(start_y + 8 +x, 23 +x, "%s", welcome);
+    mvprintw(start_y + 8 +y, 23 +x, "%s", welcome);
 
-    attroff(COLOR_PAIR(8));
+    attroff(COLOR_PAIR(5));
     refresh();
     getch();
     curs_set(1);
