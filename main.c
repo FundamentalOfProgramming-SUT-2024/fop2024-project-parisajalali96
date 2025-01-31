@@ -187,6 +187,7 @@ void get_score (char*, int , int );
 void play_menu ();
 void load_hall();
 void hall_of_fame();
+void display_hits();
 
 //prototypes
 void pick_one (int highlight, char* menu_name, char * options[], int n) {
@@ -374,6 +375,16 @@ void messages(char *what_happened, int maybe) {
         printw("You dropped the %s!", weapon);
         attroff(COLOR_PAIR(2));
 
+    } else if (strcmp(what_happened, "monster frozen") == 0) {
+        char name [30];
+        if (monsters[maybe].type == 'D') strcpy(name, "Deamon");
+        else if (monsters[maybe].type == 'F') strcpy(name, "Fire Breathing Monster");
+        else if (monsters[maybe].type == 'G') strcpy(name, "Giant");
+        else if (monsters[maybe].type == 'S') strcpy(name, "Snake");
+        else if (monsters[maybe].type == 'U') strcpy(name, "Undeed");
+        attron(COLOR_PAIR(2));
+        printw("The spell paralyzes The %s!", name);
+        attroff(COLOR_PAIR(2));
     }
 
     refresh();
@@ -1214,7 +1225,10 @@ void player_attack (int mx, int my, char type) {
 
     for (int i = 0; i < monster_count; i ++) {
         if (monsters[i].x == mx && monsters[i].y == my) {
-            if (type == '~') monsters[i].movement_state = 1;
+            if (type == '~') {
+                monsters[i].movement_state = 1;
+                messages("monster frozen", i);
+            }
             monsters[i].health -= damage;
             monster_health_check(&monsters[i]);
             messages("player attack", i);
@@ -1222,6 +1236,7 @@ void player_attack (int mx, int my, char type) {
                 map[my][mx] = '.';
                 messages("monster dead", i);
                 hits ++;
+                display_hits();
             }
         }
     }
@@ -1468,12 +1483,12 @@ void dagger_wand_attack (int px, int py, char * direction, int type) {
     }
     bool weapon_used = false;
     for (int i = 0; i < distance; i ++) {
+        if (map[py + i * dy][px + i * dx] == '|' || map[py + i * dy][px + i * dx] == '-') {
+            drop_weapon(px + (i-1) * dx, py + (i-1) * dy, weapon_in_hand);
+            messages("weapon drop", type);
+            return;
+        }
         for ( int j = 0; j < monster_count; j ++) {
-            if (map[py + i * dy][px + i * dx] == '|' || map[py + i * dy][px + i * dx] == '-') {
-                drop_weapon(px + (i-1) * dx, py + (i-1) * dy, weapon_in_hand);
-                messages("weapon drop", type);
-                return;
-            }
             if ((monsters[j].x == px + i * dx) && (monsters[j].x == px + i * dx)) {
                 player_attack(monsters[j].x, monsters[j].y, symbol);
                 weapon_used = true;
@@ -1486,6 +1501,13 @@ void dagger_wand_attack (int px, int py, char * direction, int type) {
         messages("weapon drop", type);
     }
     
+}
+
+void display_hits () {
+    attron(COLOR_PAIR(2));
+    mvprintw(LINES -1, COLS/2 + 12 - 55, "Hits: %d", hits);
+    attroff(COLOR_PAIR(2));
+    refresh();
 }
 
 void desplay_gold () {
@@ -2246,6 +2268,7 @@ void generate_map (){
         hunger_bar(hunger);
         show_level();
         desplay_gold();
+        display_hits();
         render_map();
         init_colors();
         //player_in_room(px, py, rooms[level], room_count[level]);
