@@ -1,1 +1,1 @@
-Guest_Player 250 250 1
+Guest_Player 100 100 1

@@ -1212,9 +1212,9 @@ void player_attack (int mx, int my, char type) {
     else if (type == 'a') damage = 5;
     else if (type == '!') damage = 10;
 
-    
     for (int i = 0; i < monster_count; i ++) {
         if (monsters[i].x == mx && monsters[i].y == my) {
+            if (type == '~') monsters[i].movement_state = 1;
             monsters[i].health -= damage;
             monster_health_check(&monsters[i]);
             messages("player attack", i);
@@ -1470,7 +1470,7 @@ void dagger_wand_attack (int px, int py, char * direction, int type) {
     for (int i = 0; i < distance; i ++) {
         for ( int j = 0; j < monster_count; j ++) {
             if (map[py + i * dy][px + i * dx] == '|' || map[py + i * dy][px + i * dx] == '-') {
-                drop_weapon(px + i * dx, py + i * dy, weapon_in_hand);
+                drop_weapon(px + (i-1) * dx, py + (i-1) * dy, weapon_in_hand);
                 messages("weapon drop", type);
                 return;
             }
@@ -1498,6 +1498,7 @@ void desplay_gold () {
 void monster_move(int px, int py, struct monster *m) {
     
     if (m->type == 'G' || m->type == 'U') if (m->movement_num > 5) return;
+    if (m->movement_state == 1) return;
     int my = m->y;
     int mx = m->x;
 
@@ -1766,52 +1767,66 @@ void weapon_window () {
     int dag = 0, wand = 0, arrow = 0, sword = 0;
     for ( int i = 0; i < weapon_count; i ++) {
         //if (weapons[i].symbol == 'm' && weapons[i].state == 0) mace++;
-        if (weapons[i].symbol == 'd' && weapons[i].state == 0) dag++;
-        if (weapons[i].symbol == '~' && weapons[i].state == 0) wand++;
-        if (weapons[i].symbol == 'a' && weapons[i].state == 0) arrow++;
-        if (weapons[i].symbol == '!' && weapons[i].state == 0) sword++;
+        if (weapons[i].symbol == 'd' && weapons[i].state != -1) dag++;
+        if (weapons[i].symbol == '~' && weapons[i].state != -1) wand++;
+        if (weapons[i].symbol == 'a' && weapons[i].state != -1) arrow++;
+        if (weapons[i].symbol == '!' && weapons[i].state != -1) sword++;
     }
     
     
     int mace_id = 0, dag_id = 0, wand_id = 0, arrow_id = 0, sword_id = 0;
     int identifier = 1;
-    int color = 10;
     if (1) {
+        int color = 10;
+        char star = ' ';
         if (identifier == wield_choice) color = 6;
+        if (color == 6) star = '*';
         wattron(arsenal,COLOR_PAIR(color));
-        mvwprintw(arsenal, identifier + 1, 1, "%d. %d Mace", identifier, 1);
+        mvwprintw(arsenal, identifier + 1, 1, "%c %d. %d Mace",star, identifier, 1);
         wattroff(arsenal,COLOR_PAIR(color));
         mace_id = 1;
         identifier++;
     }
     if (dag != 0) {
+        int color = 10;
+        char star = ' ';
         if (identifier == wield_choice) color = 6;
+        if (color == 6) star = '*';
         wattron(arsenal,COLOR_PAIR(color));
-        mvwprintw(arsenal, identifier + 1, 1, "%d. %d Dagger", identifier, dag);
+        mvwprintw(arsenal, identifier + 1, 1, "%c %d. %d Dagger", star, identifier, dag);
         wattroff(arsenal,COLOR_PAIR(color));
         dag_id = identifier;
         identifier ++;
     }
     if (wand != 0) {
+        int color = 10;
+        char star = ' ';
         if (identifier == wield_choice) color = 6;
+        if (color == 6) star = '*';
         wattron(arsenal,COLOR_PAIR(color));
-        mvwprintw(arsenal, identifier + 1, 1, "%d. %d Magic Wand",identifier, wand);
+        mvwprintw(arsenal, identifier + 1, 1, "%c %d. %d Magic Wand", star, identifier, wand);
         wattroff(arsenal,COLOR_PAIR(color));
         wand_id = identifier;
         identifier ++;
     }
     if (arrow != 0) {
+        int color = 10;
+        char star = ' ';
         if (identifier == wield_choice) color = 6;
+        if (color == 6) star = '*';
         wattron(arsenal,COLOR_PAIR(color));
-        mvwprintw(arsenal, identifier + 1, 1, "%d. %d Normal Arrow",identifier, arrow);
+        mvwprintw(arsenal, identifier + 1, 1, "%c %d. %d Normal Arrow",star, identifier, arrow);
         wattroff(arsenal, COLOR_PAIR(color));
         arrow_id = identifier;
         identifier ++;
     }
     if (sword != 0) {
+        int color = 10;
+        char star = ' ';
         if (identifier == wield_choice) color = 6;
+        if (color == 6) star = '*';
         wattron(arsenal, COLOR_PAIR(color));
-        mvwprintw(arsenal, identifier + 1, 1, "%d. %d Sword",identifier, sword);
+        mvwprintw(arsenal, identifier + 1, 1, "%c %d. %d Sword",star, identifier, sword);
         wattroff(arsenal, COLOR_PAIR(color));
         sword_id = identifier;
         identifier ++;
@@ -1821,7 +1836,7 @@ void weapon_window () {
 
     
     int choice = getch();
-    wield_choice = choice;
+    wield_choice = choice - '0';
     choice = choice - '0';
     if (choice == mace_id) weapon_choice('m');
     else if (choice == dag_id) weapon_choice('d');
@@ -2223,7 +2238,7 @@ void generate_map (){
     while (1) {
         //g_state = 0;
         curs_set(0);
-       // clear();
+        // clear();
         refresh();
         cbreak();
         noecho();
@@ -2277,30 +2292,32 @@ void generate_map (){
         } else if (ch == 'g') {
             cheat_g();
         } else if (ch == ' ') {
-            struct monster mon = monster_in_room(px, py);
-            if (mon.x != -1 && mon.y != -1 && mon.state == 0) {
-                if (weapon_in_hand) {
-                    if ((weapon_in_hand->symbol == 'd' || weapon_in_hand->symbol == '~')) {
-                        int direction = getch();
-                        char dir[3];
-                        int type = 0;
-                        if (direction == KEY_UP) strcpy(dir, "u");
-                        else if (direction == KEY_DOWN) strcpy(dir, "d");
-                        else if (direction == KEY_LEFT) strcpy(dir, "l");
-                        else if (direction == KEY_RIGHT) strcpy(dir, "r");
-                        else if (direction == 'U') strcpy(dir, "ur");
-                        else if (direction == 'B') strcpy(dir, "dl");
-                        else if (direction == 'N') strcpy(dir, "dr");
-                        else if (direction == 'Y') strcpy(dir, "ul");
-                        
-                        if (weapon_in_hand->symbol == 'd') type = 0;
-                        else type = 1;
-                        dagger_wand_attack(px, py, dir, type);
-                    } else player_attack(mon.x, mon.y, weapon_in_hand->symbol);
-                } else messages("no weapon", 0);
-            } else messages("no monster", 0);
-        }
-        else if (ch == 'f') {
+            if (weapon_in_hand) {
+                if ((weapon_in_hand->symbol == 'd' || weapon_in_hand->symbol == '~')) {
+                    int direction = getch();
+                    char dir[3];
+                    int type = 0;
+                    if (direction == KEY_UP) strcpy(dir, "u");
+                    else if (direction == KEY_DOWN) strcpy(dir, "d");
+                    else if (direction == KEY_LEFT) strcpy(dir, "l");
+                    else if (direction == KEY_RIGHT) strcpy(dir, "r");
+                    else if (direction == 'U') strcpy(dir, "ur");
+                    else if (direction == 'B') strcpy(dir, "dl");
+                    else if (direction == 'N') strcpy(dir, "dr");
+                    else if (direction == 'Y') strcpy(dir, "ul");
+                    
+                    if (weapon_in_hand->symbol == 'd') type = 0;
+                    else type = 1;
+                    dagger_wand_attack(px, py, dir, type);
+                } else {
+                    struct monster mon = monster_in_room(px, py);
+                    if (mon.x != -1 && mon.y != -1 && mon.state == 0) {
+                        player_attack(mon.x, mon.y, weapon_in_hand->symbol);
+                    } else messages("no monster", 0);
+                }
+            } else messages("no weapon", 0);
+        
+    } else if (ch == 'f') {
             int condition [2] = {0};
             int direction = getch();
             if (direction == KEY_UP || direction == 'J') condition[0] =-1;
