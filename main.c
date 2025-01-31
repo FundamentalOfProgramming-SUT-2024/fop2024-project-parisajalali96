@@ -3,6 +3,9 @@
 //  rogue (parisa's version)
 //
 //  Created by parisa on 12/22/24.
+//Parisa Jalali
+//403170933
+
 #include <stdio.h>
 #include <curses.h>
 #include <string.h>
@@ -11,7 +14,6 @@
 #include <time.h>
 #include <stdlib.h>
 #include <locale.h>
-
 
 #define MAX_SIZE 100
 #define HEIGHT 30
@@ -30,7 +32,7 @@
 #define HUNGER_R 5
 #define HEALTH_TIME 20
 #define MAX_GOLD 1000
-//403170933
+
 struct ROOM {
     int x, y, height, width, type;
 };
@@ -101,6 +103,8 @@ struct monster {
     char type;
     int num;
     int state;
+    int movement_num;
+    int movement_state;
 };
 // structs
 
@@ -150,7 +154,9 @@ int gold = 100;
 int score = 100;
 
 struct weapon weapons[50];
+struct weapon * weapon_in_hand;
 int weapon_count = 0;
+int wield_choice = 1;
 
 struct potion potions[50];
 int potion_count = 0;
@@ -162,6 +168,8 @@ struct monster monsters[40];
 int monster_count = 0;
 
 char user_name [30] = "Guest_Player";
+int hits = 0;
+
 //global stuff
 
 void generate_map ();
@@ -356,6 +364,16 @@ void messages(char *what_happened, int maybe) {
         attroff(COLOR_PAIR(9));
     } else if (strcmp(what_happened, "no monster") == 0) {
         printw("There are no monsters around you.");
+    } else if (strcmp(what_happened, "no weapon") == 0) {
+        printw("You're not wielding any weapon!");
+    } else if (strcmp(what_happened, "weapon drop") == 0) {
+        char weapon [20];
+        if (maybe == 'd') strcpy(weapon, "Dagger");
+        else strcpy(weapon, "Magic Wand");
+        attron(COLOR_PAIR(2));
+        printw("You dropped the %s!", weapon);
+        attroff(COLOR_PAIR(2));
+
     }
 
     refresh();
@@ -626,6 +644,8 @@ void add_monster (struct ROOM room) {
                 monsters[monster_count].type = symbol;
                 map[y][x] = symbol;
                 monsters[monster_count].state = 0;
+                monsters[monster_count].movement_num = 0;
+                monsters[monster_count].movement_state = 0;
                 monster_count++;
             }
         }
@@ -694,6 +714,7 @@ void reveal_door (int ny, int nx) {
         attroff(COLOR_PAIR(2));
         refresh();
     }
+    render_map();
 }
 
 void lose_health (int value) {
@@ -1181,15 +1202,26 @@ void monster_health_check (struct monster * monster) {
     else monster->state = 0;
 }
 
-void player_attack (int mx, int my) {
+void calculate_score () {
+    score = hits*50*0.5 + gold*0.5;
+}
+void player_attack (int mx, int my, char type) {
+    int damage = 5;
+    if (type == 'd') damage = 12;
+    else if (type == '~') damage = 15;
+    else if (type == 'a') damage = 5;
+    else if (type == '!') damage = 10;
+
+    
     for (int i = 0; i < monster_count; i ++) {
         if (monsters[i].x == mx && monsters[i].y == my) {
-            monsters[i].health -= 5;
+            monsters[i].health -= damage;
             monster_health_check(&monsters[i]);
             messages("player attack", i);
             if (monsters[i].state) {
                 map[my][mx] = '.';
                 messages("monster dead", i);
+                hits ++;
             }
         }
     }
@@ -1398,6 +1430,64 @@ void show_level () {
     refresh();
 }
 
+void drop_weapon (int x, int y, struct weapon * weapon) {
+    weapon->x = x;
+    weapon->y = y;
+    weapon->state = 0;
+    map[y][x] = weapon->symbol;
+}
+void dagger_wand_attack (int px, int py, char * direction, int type) {
+    int distance;
+    char symbol;
+    if (type == 0) {
+        distance = 5;
+        symbol = 'd';
+    }
+    else {
+        distance = 10;
+        symbol = '~';
+    }
+    int dx = 0, dy = 0;
+    
+    if (strcmp(direction, "u") == 0) dy = -1;
+    else if (strcmp(direction, "d") == 0) dy = +1;
+    else if (strcmp(direction, "l") == 0) dx = -1;
+    else if (strcmp(direction, "ur") == 0) dx = +1;
+    else if (strcmp(direction, "ur") == 0) {
+        dx = +1;
+        dy = -1;
+    } else if (strcmp(direction, "ul") == 0) {
+        dx = -1;
+        dy = -1;
+    } else if (strcmp(direction, "dl") == 0) {
+        dx = -1;
+        dy = +1;
+    } else if (strcmp(direction, "dr") == 0) {
+        dx = +1;
+        dy = +1;
+    }
+    bool weapon_used = false;
+    for (int i = 0; i < distance; i ++) {
+        for ( int j = 0; j < monster_count; j ++) {
+            if (map[py + i * dy][px + i * dx] == '|' || map[py + i * dy][px + i * dx] == '-') {
+                drop_weapon(px + i * dx, py + i * dy, weapon_in_hand);
+                messages("weapon drop", type);
+                return;
+            }
+            if ((monsters[j].x == px + i * dx) && (monsters[j].x == px + i * dx)) {
+                player_attack(monsters[j].x, monsters[j].y, symbol);
+                weapon_used = true;
+            }
+        }
+        
+    }
+    if (!weapon_used) {
+        drop_weapon(px + distance * dx, py + distance * dy, weapon_in_hand);
+        messages("weapon drop", type);
+    }
+    
+}
+
 void desplay_gold () {
     attron(COLOR_PAIR(5));
     mvprintw(LINES -1, COLS/2 + 12, "Gold: %d", gold);
@@ -1406,6 +1496,8 @@ void desplay_gold () {
 }
 
 void monster_move(int px, int py, struct monster *m) {
+    
+    if (m->type == 'G' || m->type == 'U') if (m->movement_num > 5) return;
     int my = m->y;
     int mx = m->x;
 
@@ -1431,6 +1523,7 @@ void monster_move(int px, int py, struct monster *m) {
         map[my][mx] = '.';
         m->x = nx;
         m->y = ny;
+        m->movement_num ++;
         map[ny][nx] = m->type;
     }
     
@@ -1648,9 +1741,18 @@ void food_window () {//damn what is this
 }
 
 void weapon_choice (char symbol) {
+    
+    for ( int i = 0; i < weapon_count; i ++) {
+        if (weapons[i].state == 1) {
+            weapons[i].state =0;
+           // break;
+        }
+    }
+    
     for ( int i = 0; i < weapon_count; i ++) {
         if (weapons[i].symbol == symbol && weapons[i].state == 0) {
             weapons[i].state =1;
+            weapon_in_hand = &weapons[i];
             break;
         }
     }
@@ -1661,53 +1763,65 @@ void weapon_window () {
     wclear(arsenal);
     box(arsenal, 0, 0);
 
-    int mace = 0, dag = 0, wand = 0, arrow = 0, sword = 0;
+    int dag = 0, wand = 0, arrow = 0, sword = 0;
     for ( int i = 0; i < weapon_count; i ++) {
-        if (weapons[i].symbol == 'm' && weapons[i].state == 0) mace++;
+        //if (weapons[i].symbol == 'm' && weapons[i].state == 0) mace++;
         if (weapons[i].symbol == 'd' && weapons[i].state == 0) dag++;
         if (weapons[i].symbol == '~' && weapons[i].state == 0) wand++;
         if (weapons[i].symbol == 'a' && weapons[i].state == 0) arrow++;
         if (weapons[i].symbol == '!' && weapons[i].state == 0) sword++;
     }
     
+    
     int mace_id = 0, dag_id = 0, wand_id = 0, arrow_id = 0, sword_id = 0;
     int identifier = 1;
-    if (mace != 0) {
-        mvwprintw(arsenal, identifier + 1, 1, "%d. %d Maces", identifier, mace);
-        mace_id = identifier;
+    int color = 10;
+    if (1) {
+        if (identifier == wield_choice) color = 6;
+        wattron(arsenal,COLOR_PAIR(color));
+        mvwprintw(arsenal, identifier + 1, 1, "%d. %d Mace", identifier, 1);
+        wattroff(arsenal,COLOR_PAIR(color));
+        mace_id = 1;
         identifier++;
     }
     if (dag != 0) {
+        if (identifier == wield_choice) color = 6;
+        wattron(arsenal,COLOR_PAIR(color));
         mvwprintw(arsenal, identifier + 1, 1, "%d. %d Dagger", identifier, dag);
+        wattroff(arsenal,COLOR_PAIR(color));
         dag_id = identifier;
         identifier ++;
     }
     if (wand != 0) {
+        if (identifier == wield_choice) color = 6;
+        wattron(arsenal,COLOR_PAIR(color));
         mvwprintw(arsenal, identifier + 1, 1, "%d. %d Magic Wand",identifier, wand);
+        wattroff(arsenal,COLOR_PAIR(color));
         wand_id = identifier;
         identifier ++;
     }
     if (arrow != 0) {
+        if (identifier == wield_choice) color = 6;
+        wattron(arsenal,COLOR_PAIR(color));
         mvwprintw(arsenal, identifier + 1, 1, "%d. %d Normal Arrow",identifier, arrow);
+        wattroff(arsenal, COLOR_PAIR(color));
         arrow_id = identifier;
         identifier ++;
     }
     if (sword != 0) {
+        if (identifier == wield_choice) color = 6;
+        wattron(arsenal, COLOR_PAIR(color));
         mvwprintw(arsenal, identifier + 1, 1, "%d. %d Sword",identifier, sword);
+        wattroff(arsenal, COLOR_PAIR(color));
         sword_id = identifier;
         identifier ++;
-    }
-    
-    if (mace == 0 && dag == 0 && arrow == 0 && sword == 0 && wand == 0) {
-        char text [50] = "You don't have any weapons to wield!";
-        int x = (40 - strlen(text)) / 2;
-        mvwprintw(arsenal, 5, x, "%s", text);
     }
     
     wrefresh(arsenal);
 
     
     int choice = getch();
+    wield_choice = choice;
     choice = choice - '0';
     if (choice == mace_id) weapon_choice('m');
     else if (choice == dag_id) weapon_choice('d');
@@ -1795,21 +1909,20 @@ void add_weapon (struct ROOM room) {
         for (int x = room.x; x < room.x + room.width; x++) {
             //if (food_count >= MAX_FOOD) break;
             if (rand () % 50 == 0 && map[y][x] == '.') {
-                int type = rand() % 5;
+                int type = rand() % 4;
                 char symbol;
-                if (type == 0) {
-                    symbol = 'm';
-                } else if (type == 1) {
+               if (type == 0) {
                     symbol = 'd';
-                } else if (type == 2) {
+                } else if (type == 1) {
                     symbol = '~';
-                } else if (type == 3) {
+                } else if (type == 2) {
                     symbol = 'a';
                 } else {
                     symbol = '!';
                 }
+                if (weapon_count == 0) symbol = 'm';
                 weapons[weapon_count].symbol = symbol;
-                map[y][x] = symbol;
+                if (weapon_count) map[y][x] = symbol;
                 weapons[weapon_count].x = x;
                 weapons[weapon_count].y = y;
                 weapons[weapon_count].state = -1;
@@ -1817,6 +1930,7 @@ void add_weapon (struct ROOM room) {
             }
         }
     }
+    weapon_in_hand = &weapons[0];
 }
 
 void picked_tresure () {
@@ -2002,6 +2116,7 @@ void end_game (char state) {
         wrefresh(winner);
         getch();
         delwin(winner);
+        calculate_score();
         get_score(user_name, score, gold);
         load_hall();
         hall_of_fame();
@@ -2025,6 +2140,7 @@ void end_game (char state) {
         wrefresh(loser);
         getch();
         delwin(loser);
+        calculate_score();
         get_score(user_name, score, gold);
         load_hall();
         hall_of_fame();
@@ -2162,8 +2278,27 @@ void generate_map (){
             cheat_g();
         } else if (ch == ' ') {
             struct monster mon = monster_in_room(px, py);
-            if (mon.x != -1 && mon.y != -1 && mon.state == 0) player_attack(mon.x, mon.y);
-            else messages("no monster", 0);
+            if (mon.x != -1 && mon.y != -1 && mon.state == 0) {
+                if (weapon_in_hand) {
+                    if ((weapon_in_hand->symbol == 'd' || weapon_in_hand->symbol == '~')) {
+                        int direction = getch();
+                        char dir[3];
+                        int type = 0;
+                        if (direction == KEY_UP) strcpy(dir, "u");
+                        else if (direction == KEY_DOWN) strcpy(dir, "d");
+                        else if (direction == KEY_LEFT) strcpy(dir, "l");
+                        else if (direction == KEY_RIGHT) strcpy(dir, "r");
+                        else if (direction == 'U') strcpy(dir, "ur");
+                        else if (direction == 'B') strcpy(dir, "dl");
+                        else if (direction == 'N') strcpy(dir, "dr");
+                        else if (direction == 'Y') strcpy(dir, "ul");
+                        
+                        if (weapon_in_hand->symbol == 'd') type = 0;
+                        else type = 1;
+                        dagger_wand_attack(px, py, dir, type);
+                    } else player_attack(mon.x, mon.y, weapon_in_hand->symbol);
+                } else messages("no weapon", 0);
+            } else messages("no monster", 0);
         }
         else if (ch == 'f') {
             int condition [2] = {0};
