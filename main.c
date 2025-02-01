@@ -2413,6 +2413,7 @@ void cheat_g () {
     g_state = 1;
 }
 void generate_map (){
+    curs_set(0);
     bool treasure_room_place = false;
     init_map();
     while (room_count[level] < ROOM_COUNT) {
@@ -2779,44 +2780,67 @@ void setting_menu (){
         }
     }
 }
-       
 
-void start_game_menu () {
-    int ch;
-    int choice = 0;
-    char * options [] = {"New Game", "Continue Previous Game", "Game Settings", "Exit"};
-    char menu_name[50] = {"Game Menu"};
+void start_game_menu() {
+    int ch, choice = 0;
+    const char *menu_name = "** GAME MENU **";
+    const char *options[] = {"New Game", "Continue Previous Game", "Game Settings", "Exit"};
+    int num_options = sizeof(options) / sizeof(options[0]);
+    int height = 12, width = 50;
+    int rows, cols;
+    
+    getmaxyx(stdscr, rows, cols);
+    int start_y = (rows - height) / 2;
+    int start_x = (cols - width) / 2;
+    
+    WINDOW *menu_win = newwin(height, width, start_y, start_x);
+    keypad(menu_win, TRUE);
+    box(menu_win, 0, 0);
+    
     while (1) {
-        clear();
-        pick_one(choice, menu_name, options, 4);
-        refresh();
+        wclear(menu_win);
+        box(menu_win, 0, 0);
+        mvwprintw(menu_win, 1, (width - strlen(menu_name)) / 2, "%s", menu_name);
         
-        ch = getch();
+        for (int i = 0; i < num_options; i++) {
+            if (i == choice) {
+                wattron(menu_win, COLOR_PAIR(3));
+                mvwprintw(menu_win, 3 + i, (width - strlen(options[i])) / 2, "%s", options[i]);
+                wattroff(menu_win, COLOR_PAIR(3));
+            } else {
+                mvwprintw(menu_win, 3 + i, (width - strlen(options[i])) / 2, "%s", options[i]);
+            }
+        }
+        
+        wrefresh(menu_win);
+        ch = wgetch(menu_win);
+        
         if (ch == KEY_UP && choice > 0) choice--;
-        else if (ch == KEY_DOWN && choice < 4) choice++;
+        else if (ch == KEY_DOWN && choice < num_options - 1) choice++;
         else if (ch == '\n') {
             if (choice == 0) { // New Game
                 init_map();
                 generate_map();
-                //render_map();
                 getch();
                 refresh();
-            } else if (choice == 1) {// Prev Game (make the menu later)
+            } else if (choice == 1) { // Continue Previous Game
                 getch();
                 refresh();
-            } else if (choice == 2) {//Settings
+            } else if (choice == 2) { // Game Settings
                 setting_menu();
                 getch();
                 refresh();
-            } else if (choice == 3) {// Exit
+            } else if (choice == 3) { // Exit
                 play_menu();
                 getch();
                 refresh();
             }
         }
-        
     }
+    
+    delwin(menu_win);
 }
+
 
 bool valid_pass(char* password) {
     if (strlen(password) < 7) {
@@ -2935,28 +2959,48 @@ void forgot_pass (char* username) {
     }
 }
 
-void play_menu () {
+void play_menu() {
     char username[50], password[50], email[50];
     int ch;
     int choice = 0;
-    char menu_name [50] = {"Play Menu"};
-    char * options [] = { "Play as a Guest" ,"Login", "Register", "Forgot Password", "Exit"};
+    char menu_name[50] = {"** PLAY MENU **"};
+    char *options[] = {"Play as a Guest", "Login", "Register", "Forgot Password", "Exit"};
+    int height = 12, width = 40;
+    int rows, cols;
+    
+    getmaxyx(stdscr, rows, cols);
+    int start_y = (rows - height) / 2;
+    int start_x = (cols - width) / 2;
+    
+    WINDOW *menu_win = newwin(height, width, start_y, start_x);
+    keypad(menu_win, TRUE);
+    box(menu_win, 0, 0);
+    
     while (1) {
-        clear();
-        pick_one(choice, menu_name, options, 5);
-        refresh();
-        
-        ch = getch();
+        wclear(menu_win);
+        box(menu_win, 0, 0);
+        mvwprintw(menu_win, 1, (width - strlen(menu_name)) / 2, "%s", menu_name);
+
+        for (int i = 0; i < 5; i++) {
+            if (i == choice) {
+                wattron(menu_win, COLOR_PAIR(6));
+                mvwprintw(menu_win, 3 + i, (width - strlen(options[i])) / 2, "%s", options[i]);
+                wattroff(menu_win,  COLOR_PAIR(6));
+            } else {
+                mvwprintw(menu_win, 3 + i, (width - strlen(options[i])) / 2, "%s", options[i]);
+            }
+        }
+
+        wrefresh(menu_win);
+        ch = wgetch(menu_win);
+
         if (ch == KEY_UP && choice > 0) choice--;
         else if (ch == KEY_DOWN && choice < 4) choice++;
         else if (ch == '\n') {
-            if (choice == 0) { //guest
+            if (choice == 0) {
                 clear();
-                printw("You are now playing as a guest!\n");
-                printw("Press any key to continue.\n");
-                getch();
                 start_game_menu();
-            } else if (choice == 1) { // Login
+            } else if (choice == 1) {
                 clear();
                 get_info("Enter username: ", username, 50, 0);
                 strcpy(user_name, username);
@@ -2970,7 +3014,7 @@ void play_menu () {
                 }
                 refresh();
                 getch();
-            } else if (choice == 2) { // Register
+            } else if (choice == 2) {
                 while (1) {
                     clear();
                     get_info("Enter username: ", username, 50, 0);
@@ -3007,21 +3051,23 @@ void play_menu () {
                 printw("Registration successful!\n");
                 refresh();
                 getch();
-            } else if ( choice == 3) { // forgot pass
+            } else if (choice == 3) {
                 get_info("Enter your username: ", username, 50, 0);
                 refresh();
                 printw("Do you pinky promise it's you, %s? :(", username);
                 getch();
                 forgot_pass(username);
-            } else if (choice == 4) { //exit
+            } else if (choice == 4) {
                 clear();
                 refresh();
                 break;
             }
         }
-        
     }
+
+    delwin(menu_win);
 }
+
 
 void load_hall () {
     FILE * file = fopen("hall_of_fame.txt", "r");
@@ -3124,37 +3170,134 @@ void hall_of_fame() {
     getch();
 }
 
-
-void main_menu (){
-    char username[50], password[50], email[50];
+void main_menu() {
     int ch, choice = 0;
-    char menu_name [50] = {"Main Menu"};
-    char * options [] = { "Play", "Hall of Fame"};
+    const char *menu_name = "** MAIN MENU **";
+    const char *options[] = {"Play", "Hall of Fame", "Exit"};
+    int num_options = sizeof(options) / sizeof(options[0]);
+    int height = 12, width = 40;
+    int rows, cols;
+    
+    getmaxyx(stdscr, rows, cols);
+    int start_y = (rows - height) / 2;
+    int start_x = (cols - width) / 2;
+    
+    WINDOW *menu_win = newwin(height, width, start_y, start_x);
+    keypad(menu_win, TRUE);
+    box(menu_win, 0, 0);
+    
     while (1) {
-        clear();
-        pick_one(choice, menu_name, options, 2);
-        refresh();
+        wclear(menu_win);
+        box(menu_win, 0, 0);
+        mvwprintw(menu_win, 1, (width - strlen(menu_name)) / 2, "%s", menu_name);
         
-        ch = getch();
+        for (int i = 0; i < num_options; i++) {
+            if (i == choice) {
+                wattron(menu_win, COLOR_PAIR(4));
+                mvwprintw(menu_win, 3 + i, (width - strlen(options[i])) / 2, "%s", options[i]);
+                wattroff(menu_win, COLOR_PAIR(4));
+            } else {
+                mvwprintw(menu_win, 3 + i, (width - strlen(options[i])) / 2, "%s", options[i]);
+            }
+        }
+        
+        wrefresh(menu_win);
+        ch = wgetch(menu_win);
+        
         if (ch == KEY_UP && choice > 0) choice--;
-        if (ch == KEY_DOWN && choice < 2) choice++;
-        
-        if (ch == '\n') {
+        else if (ch == KEY_DOWN && choice < num_options - 1) choice++;
+        else if (ch == '\n') {
             if (choice == 0) { // Play
                 play_menu();
             } else if (choice == 1) { // Hall of Fame
-                while (1) {
-                    clear();
-                    load_hall();
-                    hall_of_fame();
-                    break;
-                }
+                clear();
+                load_hall();
+                hall_of_fame();
+                getch();
+            } else if (choice == 2) { // Exit
+                break;
             }
         }
     }
+    
+    delwin(menu_win);
+    endwin();
 }
 
-
+void lobby_art () {
+    int rows, cols;
+      
+    getmaxyx(stdscr, rows, cols);
+    int start_y = 3;
+    int start_x = 45;
+    attron(COLOR_PAIR(5));
+    mvprintw(start_y++, start_x, "                                                      )         ");
+    mvprintw(start_y++, start_x, "                                                        (            ");
+    mvprintw(start_y++, start_x, "                                                      '    }      ");
+    mvprintw(start_y++, start_x, "                                                    (    '      ");
+    mvprintw(start_y++, start_x, "                                                   '      (   ");
+    mvprintw(start_y++, start_x, "                                                    )  |    ) ");
+    mvprintw(start_y++, start_x, "                                                  '   /|\\    `");
+    mvprintw(start_y++, start_x, "                                                 )   / | \\  ` )   ");
+    mvprintw(start_y++, start_x, "                                                {    | | |  {   ");
+    mvprintw(start_y++, start_x, "                                               }     | | |  .");
+    mvprintw(start_y++, start_x, "                                                '    | | |    )");
+    mvprintw(start_y++, start_x, "                                               (    /| | |\\    .");
+    mvprintw(start_y++, start_x, "                                                .  / | | | \\  (");
+    mvprintw(start_y++, start_x, "                                              }    \\ \\ | / /  .        ");
+    mvprintw(start_y++, start_x, "                                               (    \\ `-' /    }");
+    mvprintw(start_y++, start_x, "                                               '    / ,-. \\    ' ");
+    mvprintw(start_y++, start_x, "                                                }  / / | \\ \\  }");
+    mvprintw(start_y++, start_x, "                                               '   \\ | | | /   } ");
+    mvprintw(start_y++, start_x, "                                                  )  | | |  )");
+    mvprintw(start_y++, start_x, "                                                  .  | | |  '");
+    mvprintw(start_y++, start_x, "                                                     J | L");
+    mvprintw(start_y++, start_x, "                                               /|    J_|_L    |\\");
+    mvprintw(start_y++, start_x, "                                               \\ \\___/ o \\___/ /");
+    mvprintw(start_y++, start_x, "                                                \\_____ _ _____/");
+    mvprintw(start_y++, start_x, "                                                      |-|");
+    mvprintw(start_y++, start_x, "                                                      |-|");
+    mvprintw(start_y++, start_x, "                                                      |-|");
+    mvprintw(start_y++, start_x, "                                                     ,'-'.");
+    mvprintw(start_y++, start_x, "                                                     '---'");
+    attroff(COLOR_PAIR(5));
+    start_x = 15;
+    start_y = 3;
+    attron(COLOR_PAIR(2));
+    mvprintw(start_y++, start_x, "              )         ");
+    mvprintw(start_y++, start_x, "                (            ");
+    mvprintw(start_y++, start_x, "              '    }      ");
+    mvprintw(start_y++, start_x, "            (    '      ");
+    mvprintw(start_y++, start_x, "           '      (   ");
+    mvprintw(start_y++, start_x, "            )  |    ) ");
+    mvprintw(start_y++, start_x, "          '   /|\\    `");
+    mvprintw(start_y++, start_x, "         )   / | \\  ` )   ");
+    mvprintw(start_y++, start_x, "        {    | | |  {   ");
+    mvprintw(start_y++, start_x, "       }     | | |  .");
+    mvprintw(start_y++, start_x, "        '    | | |    )");
+    mvprintw(start_y++, start_x, "       (    /| | |\\    .");
+    mvprintw(start_y++, start_x, "        .  / | | | \\  (");
+    mvprintw(start_y++, start_x, "    }    \\ \\ | / /  .        ");
+    mvprintw(start_y++, start_x, "       (    \\ `-' /    }");
+    mvprintw(start_y++, start_x, "       '    / ,-. \\    ' ");
+    mvprintw(start_y++, start_x, "        }  / / | \\ \\  }");
+    mvprintw(start_y++, start_x, "       '   \\ | | | /   } ");
+    mvprintw(start_y++, start_x, "          )  | | |  )");
+    mvprintw(start_y++, start_x, "          .  | | |  '");
+    mvprintw(start_y++, start_x, "             J | L");
+    mvprintw(start_y++, start_x, "       /|    J_|_L    |\\");
+    mvprintw(start_y++, start_x, "       \\ \\___/ o \\___/ /");
+    mvprintw(start_y++, start_x, "        \\_____ _ _____/");
+    mvprintw(start_y++, start_x, "              |-|");
+    mvprintw(start_y++, start_x, "              |-|");
+    mvprintw(start_y++, start_x, "              |-|");
+    mvprintw(start_y++, start_x, "             ,'-'.");
+    mvprintw(start_y++, start_x, "             '---'");
+    attroff(COLOR_PAIR(2));
+    refresh();
+   // getch();
+    //clear();
+}
 void load_welcome_page() {
     curs_set(0);
     clear();
@@ -3192,7 +3335,8 @@ void load_welcome_page() {
     attroff(COLOR_PAIR(5));
     refresh();
     getch();
-    curs_set(1);
+    clear();
+    refresh();
 
 }
 
@@ -3211,6 +3355,8 @@ int main() {
     }
     
     load_welcome_page();
+    clear();
+    lobby_art();
     main_menu();
     
     getch();
