@@ -170,7 +170,10 @@ int monster_count = 0;
 
 char user_name [30] = "Guest_Player";
 int hits = 0;
-
+int potion_time_track = 0;
+int weapon_rate = 1;
+int num_of_blocks = 1;
+bool drank_potion = false;
 //global stuff
 
 void generate_map ();
@@ -189,6 +192,9 @@ void play_menu ();
 void load_hall();
 void hall_of_fame();
 void display_hits();
+void elixir_of_everlife();
+void dragon_blood ();
+void storm_kiss ();
 
 //prototypes
 void pick_one (int highlight, char* menu_name, char * options[], int n) {
@@ -401,6 +407,19 @@ void messages(char *what_happened, int maybe) {
         mvprintw(0, 0, "You're already wielding a weapon!");
         mvprintw(1, 0, "Put the weapon in your bag!");
         attroff(COLOR_PAIR(2));
+    } else if (strcmp(what_happened, "took potion") == 0) {
+        char name [30];
+        if (maybe == 0) strcpy(name, "The Elixir of Everlife");
+        else if (maybe == 1) strcpy(name, "The Stormrider's Kiss");
+        else if (maybe == 2) strcpy(name, "The Dragon's Blood");
+        attron(COLOR_PAIR(9));
+        mvprintw(0, 0, "You drank %s!", name);
+        if (maybe == 0) mvprintw(1, 0, "Your health begins to recover!");
+        else if (maybe == 1) mvprintw(1, 0, "You move like lightning!");
+        else mvprintw(1, 0, "Your weapons are now twice as deadly!");
+        attroff(COLOR_PAIR(9));
+    } else if (strcmp(what_happened, "potion time over") == 0) {
+        printw("The potion's effects begin to wear off!");
     }
     refresh();
     getch();
@@ -1233,11 +1252,12 @@ void calculate_score () {
     score = hits*50*0.5 + gold*0.5;
 }
 void player_attack (int mx, int my, char type) {
-    int damage = 5;
-    if (type == 'd') damage = 12;
-    else if (type == '~') damage = 15;
-    else if (type == 'a') damage = 5;
-    else if (type == '!') damage = 10;
+    if (potion_time_track == 0) weapon_rate = 1;
+    int damage = weapon_rate*5;
+    if (type == 'd') damage = weapon_rate*12;
+    else if (type == '~') damage = weapon_rate*15;
+    else if (type == 'a') damage = weapon_rate*5;
+    else if (type == '!') damage = weapon_rate*10;
 
     for (int i = 0; i < monster_count; i ++) {
         if (monsters[i].x == mx && monsters[i].y == my) {
@@ -1434,12 +1454,14 @@ void hunger_update () {
     }
 }
 
-void health_update () {
+void health_update (int maybe) {
     time_t current_time;
     time(&current_time);
 
-    if (difftime(current_time, last_health_update) >= HEALTH_TIME && hunger >= 80) {
-        health += HEALTH_R;
+    if (difftime(current_time, last_health_update) >= HEALTH_TIME && hunger >= 80 ) {
+        int speed = 1;
+        if (maybe == 1 && potion_time_track) speed = 2;
+        health += speed*HEALTH_R;
         
         if (health < 0) {
             health = 0;
@@ -1850,14 +1872,21 @@ void weapon_window() {
         mac_id = identifier;
         mvwprintw(arsenal, short_y++, 5, "%d. Mace (%d)", identifier++, 1);
         wattroff(arsenal, COLOR_PAIR(color));
+        wattron(arsenal, COLOR_PAIR(2));
+        mvwprintw(arsenal, short_y++, 5, "damage = 5");
+        wattroff(arsenal, COLOR_PAIR(2));
+
     }
     if (dag > 0) {
         int color = 10;
         if (identifier == wield_choice) color = 6;
         wattron(arsenal, COLOR_PAIR(color));
         dag_id = identifier;
-        mvwprintw(arsenal, long_y++, 5, "%d. Dagger (%d)", identifier++, dag);
+        mvwprintw(arsenal, long_y++, 45, "%d. Dagger (%d)", identifier++, dag);
         wattroff(arsenal, COLOR_PAIR(color));
+        wattron(arsenal, COLOR_PAIR(5));
+        mvwprintw(arsenal, long_y++, 45, "distance = 5, damage = 5");
+        wattroff(arsenal, COLOR_PAIR(5));
     }
     if (sword > 0) {
         int color = 10;
@@ -1866,6 +1895,10 @@ void weapon_window() {
         sword_id = identifier;
         mvwprintw(arsenal, short_y++, 5, "%d. Sword (%d)", identifier++, sword);
         wattroff(arsenal, COLOR_PAIR(color));
+        wattron(arsenal, COLOR_PAIR(2));
+        mvwprintw(arsenal, short_y++, 5, "damage = 10");
+        wattroff(arsenal, COLOR_PAIR(2));
+
     }
     if (wand > 0) {
         int color = 10;
@@ -1874,6 +1907,9 @@ void weapon_window() {
         wand_id = identifier;
         mvwprintw(arsenal, long_y++, 45, "%d. Magic Wand (%d)", identifier++, wand);
         wattroff(arsenal ,COLOR_PAIR(color));
+        wattron(arsenal, COLOR_PAIR(2));
+        mvwprintw(arsenal, long_y++, 45, "distance = 10, damage = 12");
+        wattroff(arsenal, COLOR_PAIR(2));
 
     }
     if (arrow > 0) {
@@ -1883,6 +1919,9 @@ void weapon_window() {
         arrow_id = identifier;
         mvwprintw(arsenal, long_y++, 45, "%d. Normal Arrow (%d)", identifier++, arrow);
         wattroff(arsenal, COLOR_PAIR(color));
+        wattron(arsenal, COLOR_PAIR(2));
+        mvwprintw(arsenal, long_y++, 45, "distance = 5, damage = 5");
+        wattroff(arsenal, COLOR_PAIR(2));
 
     }
     
@@ -1908,14 +1947,22 @@ void potion_choice (int type) {
     for ( int i = 0; i < potion_count; i ++) {
         if (potions[i].type == type && potions[i].state == 0) {
             potions[i].state =1;
+            messages("took potion", type);
+            drank_potion = true;
             break;
         }
     }
+    if (type == 0) elixir_of_everlife();
+    else if (type == 1) storm_kiss();
+    else dragon_blood();
+    potion_time_track = 10;
 }
 void potion_window () {
     WINDOW * potion = newwin(10, 40, 0, 0);
     wclear(potion);
     box(potion, 0, 0);
+    int len = strlen ("** POTIONS **");
+    mvwprintw(potion, 1, (40 - len)/2, "** POTIONS **");
 
     int elix = 0, drag = 0, kiss = 0;
     for ( int i = 0; i < potion_count; i ++) {
@@ -1944,18 +1991,25 @@ void potion_window () {
     if (elix == 0 && drag == 0 && kiss == 0) {
         char text [50] = "You don't have any potions to drink!";
         int x = (40 - strlen(text)) / 2;
-        mvwprintw(potion, 5, x, "%s", text);
+        mvwprintw(potion, 4, x, "%s", text);
     }
     wrefresh(potion);
 
     
-    int choice = getch();
+    int choice = wgetch(potion);
     choice = choice - '0';
-    if (choice == elix_id) potion_choice(0);
-    else if (choice == drag_id) potion_choice(1);
-    else if (choice == kiss_id) potion_choice(2);
+    if (choice == elix_id) {
+        potion_choice(0);
+    }
+    else if (choice == drag_id) {
+        potion_choice(2);
+    }
+    else if (choice == kiss_id) {
+        potion_choice(1);
+    }
+
   
-    messages("took potion", 0);
+    //messages("took potion", 0);
 
 }
 void p_command () {
@@ -2067,6 +2121,19 @@ void add_gold (struct ROOM room) {
     }
 }
 
+void elixir_of_everlife () {
+    health_update(1);
+}
+
+void dragon_blood () {
+    weapon_rate = 2;
+    potion_time_track = 10;
+}
+
+void storm_kiss () {
+    num_of_blocks = 2;
+    potion_time_track = 10;
+}
 void add_potion (struct ROOM room) {
     int prob;
     int type = room.type;
@@ -2325,24 +2392,30 @@ void generate_map (){
         ch = getch();
         if (ch == 'q') break;
         int nx = px, ny = py;
-        
-        if (ch == KEY_UP || ch == 'J') ny--;
-        else if (ch == KEY_DOWN || ch == 'K') ny++;
-        else if (ch == KEY_LEFT || ch == 'H') nx--;
-        else if (ch == KEY_RIGHT || ch == 'L') nx++;
+        if (potion_time_track > 0) potion_time_track--;
+        if (potion_time_track <= 0 && drank_potion) {
+            printw("TIME OUT");
+            num_of_blocks = 1;
+            messages("potion time over", 0);
+            drank_potion = false;
+        }
+        if (ch == KEY_UP || ch == 'J') ny -= num_of_blocks;
+        else if (ch == KEY_DOWN || ch == 'K') ny+= num_of_blocks;
+        else if (ch == KEY_LEFT || ch == 'H') nx-= num_of_blocks;
+        else if (ch == KEY_RIGHT || ch == 'L') nx+= num_of_blocks;
         else if (ch == 'Y') {
-            nx--;
-            ny--;
+            nx-= num_of_blocks;
+            ny-= num_of_blocks;
         }
         else if (ch =='U') {
-            ny--;
-            nx++;
+            ny-= num_of_blocks;
+            nx+= num_of_blocks;
         } else if (ch =='B') {
-            ny++;
-            nx--;
+            ny+= num_of_blocks;
+            nx-= num_of_blocks;
         } else if (ch =='N') {
-            nx++;
-            ny++;
+            nx+= num_of_blocks;
+            ny+= num_of_blocks;
         }
         else if (ch == 'M') {
             cheat_code_M();
@@ -2542,7 +2615,7 @@ void generate_map (){
         }
         
         
-        health_update();
+        health_update(0);
         hunger_update();
         refresh();
     }
