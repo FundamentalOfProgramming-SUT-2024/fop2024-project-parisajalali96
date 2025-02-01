@@ -65,6 +65,7 @@ struct food {
     char * name;
     int color;
     int state;
+    int fresh;
 };
 
 struct gold {
@@ -171,9 +172,11 @@ int monster_count = 0;
 char user_name [30] = "Guest_Player";
 int hits = 0;
 int potion_time_track = 0;
+int food_time_out = 50;
 int weapon_rate = 1;
 int num_of_blocks = 1;
 bool drank_potion = false;
+bool ate_magic_food = false;
 //global stuff
 
 void generate_map ();
@@ -280,8 +283,11 @@ void messages(char *what_happened, int maybe) {
         printw("You picked up The %s!", name);
     } else if (strcmp(what_happened, "ate food") == 0) {
         attron(COLOR_PAIR(9));
-        printw("You successfully consumed the food!");
+        if (maybe == 0) printw("You successfully consumed the food!");
+        else if (maybe == 1) printw("The Legendry food doubles your damaging skills!");
+        else if (maybe == 2) printw("The Magical food doubles your speed!");
         attroff(COLOR_PAIR(9));
+            
 
     } else if (strcmp(what_happened, "took weapon") == 0) {
         attron(COLOR_PAIR(9));
@@ -420,6 +426,10 @@ void messages(char *what_happened, int maybe) {
         attroff(COLOR_PAIR(9));
     } else if (strcmp(what_happened, "potion time over") == 0) {
         printw("The potion's effects begin to wear off!");
+    } else if (strcmp(what_happened, "ate spoiled food") == 0) {
+        attron(COLOR_PAIR(2));
+        printw("The food was spoiled. You feel sick...");
+        attroff(COLOR_PAIR(2));
     }
     refresh();
     getch();
@@ -1644,7 +1654,7 @@ void hunger_bar (int hunger) {
     if (hunger <= 0) end_game('l');
     //if (health > 0 && health <= 50) messages("low health", 0);
     int filled = (hunger * 20) / MAX_HEALTH;
-    move(LINES - 1, COLS - 20 - 10 - 54);
+    move(LINES - 1, COLS - 20 - 10 - 56);
     addch('[');
     for (int i = 0; i < 20; i++) {
         if (i < filled) {
@@ -1662,14 +1672,14 @@ void hunger_bar (int hunger) {
     }
     addch(']');
     char state [10];
-    mvprintw(LINES -1, COLS - 39 - 54 , "Hunger: ");
+    mvprintw(LINES -1, COLS - 39 - 56 , "Hunger: ");
     if (hunger <= 100 && hunger > 80) strcpy(state, "Full");
     else if (hunger <= 80 && hunger > 60) strcpy(state, "Satisfied");
     else if (hunger <= 60 && hunger > 40) strcpy(state, "Hungry");
     else if (hunger <= 40 && hunger > 20) strcpy(state, "Starving");
     else if (hunger <= 20 && hunger > 0) strcpy(state, "Dying");
 
-    mvprintw(LINES - 1,COLS -8 - 54, "%s", state);
+    mvprintw(LINES - 1,COLS -8 - 56, "%s", state);
     refresh();
 
 }
@@ -1704,19 +1714,46 @@ void health_bar (int health) {
 void food_choice (char * name ) {
     for ( int i = 0; i < food_count; i ++) {
         if (strcmp(foods[i].name, name) == 0 && foods[i].state == 0) {
-            foods[i].state =1;
-            health += 5;
-            hunger += 5;
-            health_bar(health);
-            hunger_bar(hunger);
-            break;
+            if (foods[i].fresh == 0 || foods[i].fresh == 1)  {
+                int type = 0;
+                if (foods[i].fresh == 1 && foods[i].color == 5) {
+                    dragon_blood();
+                    type = 1;
+                } else if (foods[i].fresh == 1 && foods[i].color == 6) {
+                    storm_kiss();
+                    type = 2;
+                    ate_magic_food = true;
+                } foods[i].state =1;
+                health += 5;
+                hunger += 5;
+                health_bar(health);
+                hunger_bar(hunger);
+                messages("ate food", type);
+                break;
+            } else {
+                foods[i].state =1;
+                health -= 5;
+                hunger -= 5;
+                health_bar(health);
+                hunger_bar(hunger);
+                messages("ate spoiled food", 0);
+                break;
+            }
         }
     }
+    food_time_out = 50;
     //food_window();
 }
 
-void food_window () {//damn what is this
-    WINDOW * food = newwin(10, 40, 0, 0);
+void food_window () {
+    int max_y, max_x;
+    getmaxyx(stdscr, max_y, max_x);
+
+    int win_h = 10, win_w = 50;
+    int start_y = (max_y - win_h) / 2;
+    int start_x = (max_x - win_w) / 2;
+
+    WINDOW * food = newwin(win_h, win_w, start_y, start_x);
     wclear(food);
     box(food, 0, 0);
 
@@ -1732,6 +1769,10 @@ void food_window () {//damn what is this
         else if (strcmp(foods[i].name, "Mystery Meat") ==0 && foods[i].state == 0) meat++;
         else if (strcmp(foods[i].name, "Questionable Apple") ==0 && foods[i].state == 0) apple++;
     }
+    wattron(food,COLOR_PAIR(6));
+    int len = strlen("** FOOD **");
+    mvwprintw(food, 1, (win_w - len)/2, "** FOOD **");
+    wattroff(food,COLOR_PAIR(6));
     
     int ex_berry_id = 0, eth_berry_id = 0, pie_id = 0, amb_id = 0, cheese_id = 0, biscuit_id = 0, steak_id = 0, apple_id = 0, meat_id = 0;
     int identifier = 1;
@@ -1756,7 +1797,7 @@ void food_window () {//damn what is this
         identifier ++;
     }
     if (cheese != 0) {
-        mvwprintw(food, identifier + 1, 1, "%d. %d Slighlty Moldy Cheese",identifier, cheese);
+        mvwprintw(food, identifier + 1, 1, "%d. %d Slightly Moldy Cheese",identifier, cheese);
         cheese_id = identifier;
         identifier ++;
     }
@@ -1783,13 +1824,12 @@ void food_window () {//damn what is this
     
     if (ex_berry == 0 && eth_berry == 0 && pie == 0 && amb == 0 && cheese == 0 && biscuit == 0 && steak == 0 && apple == 0 && meat == 0 ) {
         char text [50] = "You don't have any food to consume!";
-        int x = (40 - strlen(text)) / 2;
+        int x = (win_w - strlen(text)) / 2;
         mvwprintw(food, 4, x, "%s", text);
     }
     
     wrefresh(food);
 
-    
     int choice = getch();
     choice = choice - '0';
     if (choice == ex_berry_id) food_choice("Exploding Berries");
@@ -1801,11 +1841,10 @@ void food_window () {//damn what is this
     else if (choice == steak_id) food_choice("Infernal Steak");
     else if (choice == meat_id) food_choice("Mystery Meat");
     else if (choice == apple_id) food_choice("Questionable Apple");
-    if ( choice != '\n') {
-        messages("ate food", 0);
-    }
-
+    
+    if (choice == 'q') return;
 }
+
 
 void weapon_in_bag () {
     weapon_in_hand->state = 0;
@@ -1958,14 +1997,21 @@ void potion_choice (int type) {
     potion_time_track = 10;
 }
 void potion_window () {
-    WINDOW * potion = newwin(10, 40, 0, 0);
+    int height = 10, width = 40;
+    int rows, cols;
+    getmaxyx(stdscr, rows, cols);
+    int start_y = (rows - height) / 2;
+    int start_x = (cols - width) / 2;
+    
+    WINDOW * potion = newwin(height, width, start_y, start_x);
     wclear(potion);
     box(potion, 0, 0);
-    int len = strlen ("** POTIONS **");
-    mvwprintw(potion, 1, (40 - len)/2, "** POTIONS **");
+    
+    int len = strlen("** POTIONS **");
+    mvwprintw(potion, 1, (width - len) / 2, "** POTIONS **");
 
     int elix = 0, drag = 0, kiss = 0;
-    for ( int i = 0; i < potion_count; i ++) {
+    for (int i = 0; i < potion_count; i++) {
         if (potions[i].type == 0 && potions[i].state == 0) elix++;
         if (potions[i].type == 1 && potions[i].state == 0) drag++;
         if (potions[i].type == 2 && potions[i].state == 0) kiss++;
@@ -1975,43 +2021,30 @@ void potion_window () {
     int identifier = 1;
     if (elix != 0) {
         mvwprintw(potion, identifier + 1, 1, "%d. %d Elixir of Everlife", identifier, elix);
-        elix_id = identifier;
-        identifier++;
+        elix_id = identifier++;
     }
     if (drag != 0) {
         mvwprintw(potion, identifier + 1, 1, "%d. %d Dragon's Blood", identifier, drag);
-        drag_id = identifier;
-        identifier++;
+        drag_id = identifier++;
     }
     if (kiss != 0) {
         mvwprintw(potion, identifier + 1, 1, "%d. %d Stormrider's Kiss", identifier, kiss);
-        kiss_id = identifier;
-        identifier++;
+        kiss_id = identifier++;
     }
     if (elix == 0 && drag == 0 && kiss == 0) {
-        char text [50] = "You don't have any potions to drink!";
-        int x = (40 - strlen(text)) / 2;
+        char text[] = "You don't have any potions to drink!";
+        int x = (width - strlen(text)) / 2;
         mvwprintw(potion, 4, x, "%s", text);
     }
+
     wrefresh(potion);
+    int choice = wgetch(potion) - '0';
 
-    
-    int choice = wgetch(potion);
-    choice = choice - '0';
-    if (choice == elix_id) {
-        potion_choice(0);
-    }
-    else if (choice == drag_id) {
-        potion_choice(2);
-    }
-    else if (choice == kiss_id) {
-        potion_choice(1);
-    }
-
-  
-    //messages("took potion", 0);
-
+    if (choice == elix_id) potion_choice(0);
+    else if (choice == drag_id) potion_choice(2);
+    else if (choice == kiss_id) potion_choice(1);
 }
+
 void p_command () {
     mvprintw(0, 0,"What potion would you like to drink? (press * for the list)");
     getch();
@@ -2128,11 +2161,13 @@ void elixir_of_everlife () {
 void dragon_blood () {
     weapon_rate = 2;
     potion_time_track = 10;
+    //food_time_out = 50;
 }
 
 void storm_kiss () {
     num_of_blocks = 2;
     potion_time_track = 10;
+    //food_time_out = 50;
 }
 void add_potion (struct ROOM room) {
     int prob;
@@ -2156,6 +2191,15 @@ void add_potion (struct ROOM room) {
         }
     }
 }
+
+void spoil_normal () {
+    for (int j = 0; j < food_count; j ++) {
+        if (foods[j].fresh  == 1 && foods[j].state == 0) foods[j].fresh  = 0; //turn to normal
+        else if (foods[j].fresh  == 0 && foods[j].state == 0) foods[j].fresh = -1; //rotten
+    }
+    food_time_out = 50;
+}
+
 void add_food (struct ROOM room) {
     for (int y = room.y; y < room.y + room.height; y++) {
        // if (food_count >= MAX_FOOD) break;
@@ -2165,10 +2209,13 @@ void add_food (struct ROOM room) {
                 int color = rand() % 3;
                 if (color == 0) {
                     color = 5;
+                    foods[food_count].fresh = 1;
                 } else if (color == 1) {
                     color = 2;
+                    foods[food_count].fresh  = 0;
                 } else {
                     color = 6;
+                    foods[food_count].fresh  = 1;
                 }
                 foods[food_count].color = color;
                 map[y][x] = '%';
@@ -2393,10 +2440,12 @@ void generate_map (){
         if (ch == 'q') break;
         int nx = px, ny = py;
         if (potion_time_track > 0) potion_time_track--;
-        if (potion_time_track <= 0 && drank_potion) {
-            printw("TIME OUT");
+        if (food_time_out > 0) food_time_out--;
+        if (food_time_out == 0) spoil_normal();
+        if (potion_time_track <= 0 && (drank_potion || ate_magic_food)) {
+            //printw("TIME OUT");
             num_of_blocks = 1;
-            messages("potion time over", 0);
+            if (drank_potion) messages("potion time over", 0);
             drank_potion = false;
         }
         if (ch == KEY_UP || ch == 'J') ny -= num_of_blocks;
