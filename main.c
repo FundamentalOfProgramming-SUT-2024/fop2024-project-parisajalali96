@@ -293,8 +293,6 @@ void messages(char *what_happened, int maybe) {
         attron(COLOR_PAIR(9));
         printw("You are now weilding the weapon!");
         attroff(COLOR_PAIR(9));
-    } else if (strcmp(what_happened, "took potion") == 0) {
-        
     } else if (strcmp(what_happened, "enter room") == 0) {
         if (maybe == 1) printw("You have entered an Enchant Room!");
         else if (maybe == 2) printw("You have entered The Treasure Room!");
@@ -1863,7 +1861,6 @@ void weapon_choice (char symbol) {
     }
 }
 
-
 void weapon_window() {
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
@@ -2043,6 +2040,77 @@ void potion_window () {
     if (choice == elix_id) potion_choice(0);
     else if (choice == drag_id) potion_choice(2);
     else if (choice == kiss_id) potion_choice(1);
+    delwin(potion);
+}
+
+void inventory_window() {
+    int height = 10, width = 50;
+    int rows, cols;
+    getmaxyx(stdscr, rows, cols);
+    int start_y = (rows - height) / 2;
+    int start_x = (cols - width) / 2;
+
+    WINDOW *inventory = newwin(height, width, start_y, start_x);
+    keypad(inventory, TRUE);
+    wclear(inventory);
+    box(inventory, 0, 0);
+
+    const char *options[] = {"WEAPONS", "FOOD", "POTIONS"};
+    int num_options = 3;
+    int selected = 0;
+    int key;
+
+    while (1) {
+        wclear(inventory);
+        box(inventory, 0, 0);
+        mvwprintw(inventory, 1, (width - strlen("** INVENTORY **")) / 2, "** INVENTORY **");
+        wattron(inventory, COLOR_PAIR(6));
+        mvwprintw(inventory, 2, (width - 32) / 2, "     /| ___________________");
+        mvwprintw(inventory, 3, (width - 32) / 2, "O|===|* >__________________>");
+        mvwprintw(inventory, 4, (width - 32) / 2, "     \\|");
+        wattron(inventory, COLOR_PAIR(6));
+
+        for (int i = 0, x = 5; i < num_options; i++, x += 15) {
+            if (i == selected) {
+                wattron(inventory, COLOR_PAIR(4));
+                mvwprintw(inventory, 6, x, "[ %s ]", options[i]);
+                wattroff(inventory, COLOR_PAIR(4));
+            } else {
+                wattron(inventory, COLOR_PAIR(10));
+                mvwprintw(inventory, 6, x, " %s ", options[i]);
+                wattroff(inventory, COLOR_PAIR(10));
+
+            }
+        }
+
+        wrefresh(inventory);
+        key = wgetch(inventory);
+
+        if (key == KEY_RIGHT) {
+            selected = (selected + 1) % num_options;
+        } else if (key == KEY_LEFT) {
+            selected = (selected - 1 + num_options) % num_options;
+        } else if (key == '\n') {
+            break;
+        }
+    }
+
+    delwin(inventory);
+
+    switch (selected) {
+        case 0: {
+            weapon_window();
+            break;
+        }
+        case 1: {
+            food_window();
+            break;
+        }
+        case 2: {
+            potion_window();
+            break;
+        }
+    }
 }
 
 void p_command () {
@@ -2051,9 +2119,10 @@ void p_command () {
     potion_window();
 }
 void i_command () {
-    mvprintw(0, 0,"What weapon would you like to wield? (press * for the list)");
-    getch();
-    weapon_window();
+    //mvprintw(0, 0,"What weapon would you like to wield? (press * for the list)");
+    //getch();
+   // weapon_window();
+    inventory_window();
 }
 void E_command () {
     mvprintw(0, 0,"What food would you like to eat? (press * for the list)");
