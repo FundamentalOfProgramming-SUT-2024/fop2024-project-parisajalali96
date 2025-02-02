@@ -1,1 +1,6 @@
-Guest_Player 250 300 1
+hediyeh 425 650 1
+parisa 325 400 1
+Guest_Player 150 100 1
+Guest_Player 175 150 1
+Guest_Player 600 500 1
+Guest_Player 475 550 1
