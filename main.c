@@ -204,8 +204,10 @@ void dragon_blood ();
 void storm_kiss ();
 void lobby_art();
 void main_menu();
-
+void start_game_menu();
+void show_pop_up (char * , int , char * );
 //prototypes
+
 void pick_one (int highlight, char* menu_name, char * options[], int n) {
     attron(COLOR_PAIR(1));
     printw("%s: \n", menu_name);
@@ -1044,6 +1046,7 @@ int lock_pass_input(int px, int py) {
             which_door = c;
         }
     }
+    if (locked[which_door].state == 1) return which_door;
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
 
@@ -2388,68 +2391,209 @@ void add_food (struct ROOM room) {
     }
 }
 
-/*void save_game (int px, int py) {
-    FILE * save_game = fopen("prev_games.bin", "wb");
+void save_game (char * name, int px, int py) {
+    char arg [35];
+    strcpy(arg, name);
+    strcat(arg, ".txt");
+    FILE * save_game = fopen(arg, "w");
     
+    fprintf(save_game, "Name: %s", user_name);
     fprintf(save_game, "Health: %d", health);
+    fprintf(save_game, "Hunger: %d", hunger);
+    fprintf(save_game, "Hits: %d", hits);
     fprintf(save_game, "Gold: %d", gold);
     fprintf(save_game, "Level: %d", level);
     fprintf(save_game, "Position: %d, %d", py, px);
+    fprintf(save_game, "food_count: %d", food_count);
+    fprintf(save_game, "locked_door_count: %d", locked_door_count);
+    fprintf(save_game, "secret_door_count: %d", secret_door_count);
+    fprintf(save_game, "traps_count: %d", traps_count);
+    fprintf(save_game, "gold_count: %d", gold_count);
+    fprintf(save_game, "monster_count: %d", monster_count);
+    fprintf(save_game, "potion_count: %d", potion_count);
+    fprintf(save_game, "weapon_count: %d", weapon_count);
 
+    
+    fprintf(save_game, "FOOD:");
     for ( int k = 0; k < food_count; k ++) {
-        fprintf(save_game, "Food: %s %d %d %d %d",foods[k].name, foods[k].state, foods[k].color, foods[k].x, foods[k].y );
+        fprintf(save_game, "%s %d %d %d %d",foods[k].name, foods[k].state, foods[k].color, foods[k].x, foods[k].y );
     }
     
+    fprintf(save_game, "LOCKED DOORS:");
+    for ( int k = 0; k < locked_door_count; k ++) {
+        fprintf(save_game, "%d %d %d",locked[k].state, locked[k].x, locked[k].y );
+    }
+    
+    fprintf(save_game, "HIDDEN DOORS:");
+    for ( int k = 0; k < secret_door_count; k ++) {
+        fprintf(save_game, "%d %d %d",hiddens[k].state, hiddens[k].x, hiddens[k].y );
+    }
+    
+    fprintf(save_game, "TRAPS:");
+    for ( int k = 0; k < traps_count; k ++) {
+        fprintf(save_game, "%d %d %d",traps[k].state, traps[k].x, traps[k].y );
+    }
+    
+    fprintf(save_game, "GOLDS:");
+    for ( int k = 0; k < gold_count; k ++) {
+        fprintf(save_game, "%d %d %d %d",golds[k].type, golds[k].state, golds[k].x, golds[k].y );
+    }
+    
+    fprintf(save_game, "MONSTERS:");
+    for ( int k = 0; k < monster_count; k ++) {
+        fprintf(save_game, "%c %d %d %d %d %d %d %d",monsters[k].type, monsters[k].state, monsters[k].num, monsters[k].health, monsters[k].movement_num, monsters[k].movement_state, monsters[k].x, monsters[k].y );
+    }
+    
+    fprintf(save_game, "POTIONS:");
     for ( int n = 0; n < potion_count; n ++) {
-        fprintf(save_game, "Potions: %s %d %d %d %d",potions[n].name, potions[n].state, potions[n].type, potions[n].x, potions[n].y );
+        fprintf(save_game, "%s %d %d %d %d",potions[n].name, potions[n].state, potions[n].type, potions[n].x, potions[n].y );
     }
     
-    for ( int n = 0; n < potion_count; n ++) {
-        fprintf(save_game, "Potions: %s %d %d %d %d",potions[n].name, potions[n].state, potions[n].type, potions[n].x, potions[n].y );
-    }
-    
+    fprintf(save_game, "WEAPONS:");
     for ( int m = 0; m < weapon_count; m ++) {
-        fprintf(save_game, "Weapons: %c %d %d %d",weapons[m].symbol, weapons[m].state, weapons[m].x, weapons[m].y );
+        fprintf(save_game, "%c %d %d %d %d",weapons[m].symbol, weapons[m].num_collect, weapons[m].state, weapons[m].x, weapons[m].y );
     }
     
-    
+    fprintf(save_game, "MAP:");
+
     for ( int j = 0; j < HEIGHT; j ++) {
         for ( int i = 0; i < WIDTH; i ++) {
             int visited = 0;
             if (visible[j][i]) visited = 1;
             else visited = 0;
-            fprintf(save_game, "Map: %c %d",map[j][i], visited );
+            fprintf(save_game, "%c %d",map[j][i], visited );
         }
     }
     
 }
 
-void load_prev_game () {
-    FILE * prev_game = fopen("prev_games.bin", "rb");
-    
+void load_game(char * file_name, int *px, int *py) {
+    FILE *save_file = fopen("prev_games.txt", "r");
+    if (!save_file) {
+        perror("No saved game found.");
+        return;
+    }
+
+    fscanf(save_file, "Name: %s", user_name);
+    fscanf(save_file, "Health: %d", &health);
+    fscanf(save_file, "Hunger: %d", &hunger);
+    fscanf(save_file, "Hits: %d", &hits);
+    fscanf(save_file, "Gold: %d", &gold);
+    fscanf(save_file, "Level: %d", &level);
+    fscanf(save_file, "Position: %d, %d", py, px);
+    fscanf(save_file, "food_count: %d", &food_count);
+    fscanf(save_file, "locked_door_count: %d", &locked_door_count);
+    fscanf(save_file, "secret_door_count: %d", &secret_door_count);
+    fscanf(save_file, "traps_count: %d", &traps_count);
+    fscanf(save_file, "gold_count: %d", &gold_count);
+    fscanf(save_file, "monster_count: %d", &monster_count);
+    fscanf(save_file, "potion_count: %d", &potion_count);
+    fscanf(save_file, "weapon_count: %d", &weapon_count);
+
+    fscanf(save_file, "FOOD:");
+    for (int k = 0; k < food_count; k++) {
+        fscanf(save_file, "%s %d %d %d %d", foods[k].name, &foods[k].state, &foods[k].color, &foods[k].x, &foods[k].y);
+    }
+
+    fscanf(save_file, "LOCKED DOORS:");
+    for (int k = 0; k < locked_door_count; k++) {
+        fscanf(save_file, "%d %d %d", &locked[k].state, &locked[k].x, &locked[k].y);
+    }
+
+    fscanf(save_file, "HIDDEN DOORS:");
+    for (int k = 0; k < secret_door_count; k++) {
+        fscanf(save_file, "%d %d %d", &hiddens[k].state, &hiddens[k].x, &hiddens[k].y);
+    }
+
+    fscanf(save_file, "TRAPS:");
+    for (int k = 0; k < traps_count; k++) {
+        fscanf(save_file, "%d %d %d", &traps[k].state, &traps[k].x, &traps[k].y);
+    }
+
+    fscanf(save_file, "GOLDS:");
+    for (int k = 0; k < gold_count; k++) {
+        fscanf(save_file, "%d %d %d %d", &golds[k].type, &golds[k].state, &golds[k].x, &golds[k].y);
+    }
+
+    fscanf(save_file, "MONSTERS:");
+    for (int k = 0; k < monster_count; k++) {
+        fscanf(save_file, "%c %d %d %d %d %d %d %d",
+               &monsters[k].type, &monsters[k].state, &monsters[k].num, &monsters[k].health,
+               &monsters[k].movement_num, &monsters[k].movement_state, &monsters[k].x, &monsters[k].y);
+    }
+
+    fscanf(save_file, "POTIONS:");
+    for (int n = 0; n < potion_count; n++) {
+        fscanf(save_file, "%s %d %d %d %d", potions[n].name, &potions[n].state, &potions[n].type, &potions[n].x, &potions[n].y);
+    }
+
+    fscanf(save_file, "WEAPONS:");
+    for (int m = 0; m < weapon_count; m++) {
+        fscanf(save_file, "%c %d %d %d %d", &weapons[m].symbol, &weapons[m].num_collect, &weapons[m].state, &weapons[m].x, &weapons[m].y);
+    }
+
+    fscanf(save_file, "MAP:");
     for (int j = 0; j < HEIGHT; j++) {
         for (int i = 0; i < WIDTH; i++) {
-            fscanf(prev_game, "[%d,%d]", &map[i][j].type, &map[i][j].is_visible);
-            if (j < MAP_HEIGHT - 1) {
-                fgetc(file);
-            }
+            char tile;
+            int visited;
+            fscanf(save_file, "%c %d", &tile, &visited);
+            map[j][i] = tile;
+            visible[j][i] = visited;
         }
-        fgetc(file);
     }
 
-    fclose(file);
+    fclose(save_file);
+    //printf("Game loaded successfully!\n");
 }
+
+void get_game_name (char * save_name) {
+    int height = 12, width = 40;
+    int rows, cols;
+    getmaxyx(stdscr, rows, cols);
+    int start_y = (rows - height) / 2;
+    int start_x = (cols - width) / 2;
     
+    WINDOW *name_win = newwin(height, width, start_y, start_x);
+    box(name_win, 0, 0);
+    keypad(name_win, TRUE);
+    curs_set(1);
     
+    mvwprintw(name_win, 1, (width - strlen("Enter game's name:")) / 2 - 1, "Enter game's name:");
+    wrefresh(name_win);
     
+    int ch, index = 0;
+    save_name[0] = '\0';
     
+    while (1) {
+        ch = wgetch(name_win);
+        
+        if (ch == '\n' && index > 0) {
+            save_name[index] = '\0';
+            break;
+        } else if (ch == 27) {
+            save_name[0] = '\0';
+            break;
+        } else if (ch == KEY_BACKSPACE || ch == 127) {
+            if (index > 0) {
+                index--;
+                save_name[index] = '\0';
+            }
+        } else if (index < 29 && ch >= 32 && ch <= 126) {
+            save_name[index++] = (char)ch;
+            save_name[index] = '\0';
+        }
+        
+        mvwprintw(name_win, 4, (width - 30) / 2, "%-20s", save_name);
+        wrefresh(name_win);
+    }
     
-    
-    
-    
-    
+    curs_set(0);
+    delwin(name_win);
+    show_pop_up("Your game was successfully saved!", 0, 0);
 }
- */
+
+ 
 void end_game (char state) {
     if (state == 'w') {
         clear();
@@ -2469,6 +2613,7 @@ void end_game (char state) {
         wrefresh(winner);
         getch();
         delwin(winner);
+        //save_game(1, 1);
         calculate_score();
         get_score(user_name, score, gold);
         load_hall();
@@ -2493,12 +2638,89 @@ void end_game (char state) {
         wrefresh(loser);
         getch();
         delwin(loser);
+        //save_game(1, 1);
         calculate_score();
-        get_score(user_name, score, gold);
         load_hall();
+        get_score(user_name, score, gold);
         hall_of_fame();
     }
 }
+
+void resume_save_window (int px, int py) {
+    int height = 12, width = 40;
+    int rows, cols;
+    getmaxyx(stdscr, rows, cols);
+    int start_y = (rows - height) / 2;
+    int start_x = (cols - width) / 2;
+
+    WINDOW *resume = newwin(height, width, start_y, start_x);
+    keypad(resume, TRUE);
+    wclear(resume);
+    box(resume, 0, 0);
+
+    const char *options[] = {"Quit", "Save", "Exit"};
+    int num_options = 3;
+    int selected = 0;
+    int key;
+
+    while (1) {
+        wclear(resume);
+        box(resume, 0, 0);
+        mvwprintw(resume, 1, (width - strlen("** RESUME MENU **")) / 2 + 1, "** RESUME MENU **");
+        wattron(resume, COLOR_PAIR(6));
+        mvwprintw(resume, 2, (width - 32) / 2, " \\\\\\\\\\_____________________\\\"-._");
+        mvwprintw(resume, 3, (width - 32) / 2, " /////~~~~~~~~~~~~~~~~~~~~~/.-'");
+        wattron(resume, COLOR_PAIR(6));
+
+        for (int i = 0, x = 3; i < num_options; i++, x += 12) {
+            if (i == selected) {
+                wattron(resume, COLOR_PAIR(6));
+                mvwprintw(resume, 6, x, "[ %s ]", options[i]);
+                wattroff(resume, COLOR_PAIR(6));
+            } else {
+                wattron(resume, COLOR_PAIR(10));
+                mvwprintw(resume, 6, x, " %s ", options[i]);
+                wattroff(resume, COLOR_PAIR(10));
+
+            }
+        }
+
+        wrefresh(resume);
+        key = wgetch(resume);
+
+        if (key == KEY_RIGHT) {
+            selected = (selected + 1) % num_options;
+        } else if (key == KEY_LEFT) {
+            selected = (selected - 1 + num_options) % num_options;
+        } else if (key == '\n') {
+            break;
+        }
+    }
+
+    delwin(resume);
+
+    switch (selected) {//quit
+        case 0: {
+            clear();
+            lobby_art();
+            start_game_menu();
+            break;
+        }
+        case 1: {//save
+            char name_game [30];
+            get_game_name(name_game);
+            save_game(name_game, px, py);
+            clear();
+            lobby_art();
+            start_game_menu();
+            break;
+        }
+        case 2: {//exit
+            break;
+        }
+    }
+}
+
 void cheat_g () {
     g_state = 1;
 }
@@ -2675,7 +2897,9 @@ void generate_map (){
                 }
             } else messages("no weapon", 0);
         
-    } else if (ch == 'f') {
+        } else if (ch == 'r') {
+            resume_save_window(px, py);
+        } else if (ch == 'f') {
             int condition [2] = {0};
             int direction = getch();
             if (direction == KEY_UP || direction == 'J') condition[0] =-1;
