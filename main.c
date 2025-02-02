@@ -181,6 +181,8 @@ bool ate_magic_food = false;
 
 char last_direction [3];
 bool long_range_weapon = false;
+
+double difficulty_coeff = 1;
 //global stuff
 
 void generate_map ();
@@ -488,15 +490,18 @@ void difficulty() {
                 refresh();
                 break;
             } else if (choice == 1) {//hard
+                difficulty_coeff = 0.5;
                 getch();
                 refresh();
                 break;
             } else if (choice == 2) {//medium
+                difficulty_coeff = 1;
                 getch();
                 refresh();
                 break;
             } else if (choice == 3) {//easy
                 //clear();
+                difficulty_coeff = 2;
                 refresh();
                 break;
             }
@@ -718,15 +723,15 @@ void add_pillar (struct ROOM room) {
 
 void add_monster (struct ROOM room) {
     int prob;
-    if (level == 1) prob = 50;
-    else if (level == 2) prob = 30;
-    else if (level == 3) prob = 25;
-    else prob = 20;
+    if (level == 1) prob = difficulty_coeff *50;
+    else if (level == 2) prob = difficulty_coeff * 30;
+    else if (level == 3) prob = difficulty_coeff * 25;
+    else prob = difficulty_coeff * 20;
 
     for (int y = room.y; y < room.y + room.height; y++) {
         //if (traps_count >= max) break;
         for (int x = room.x; x < room.x + room.width; x++) {
-            int type = rand () % 10;
+            int type = rand () % prob;
             char symbol = 'D';
             if (type == 0 || type == 2 || type == 3) {
                 symbol = 'D';//D
@@ -2336,7 +2341,7 @@ void storm_kiss () {
 void add_potion (struct ROOM room) {
     int prob;
     int type = room.type;
-    if (type == 1) prob = 5;
+    if (type == 1) prob = 10;
     else prob = 50;
     for (int y = room.y; y < room.y + room.height; y++) {
        // if (food_count >= MAX_FOOD) break;
@@ -2793,7 +2798,35 @@ void resume_save_window (int px, int py) {
 void cheat_g () {
     g_state = 1;
 }
+
+void fix_edges(struct ROOM room) {
+    for (int y = room.y; y < room.y + room.height; y++) {
+        if (room.x > 0 && map[y][room.x - 1] == '#') {
+            map[y][room.x] = '+';
+        }
+    }
+
+    for (int y = room.y; y < room.y + room.height; y++) {
+        if (room.x + room.width < WIDTH && map[y][room.x + room.width] == '#') {
+            map[y][room.x + room.width - 1] = '+';
+        }
+    }
+
+    for (int x = room.x; x < room.x + room.width; x++) {
+        if (room.y > 0 && map[room.y - 1][x] == '#') {
+            map[room.y][x] = '+';
+        }
+    }
+
+    for (int x = room.x; x < room.x + room.width; x++) {
+        if (room.y + room.height < HEIGHT && map[room.y + room.height][x] == '#') {
+            map[room.y + room.height - 1][x] = '+';
+        }
+    }
+}
+
 void generate_map (){
+    clear();
     curs_set(0);
     bool treasure_room_place = false;
     init_map();
@@ -2837,7 +2870,8 @@ void generate_map (){
                     new_room.y + (new_room.height - 2) / 2
                 );
 
-                door_fix(new_room);
+               door_fix(new_room);
+                fix_edges(new_room);
               // if ( rand () % 6 == 0) locked_door(new_room);
                 if ( rand () % 6 == 0) add_hidden_door(new_room);
                 
@@ -3542,7 +3576,7 @@ void load_hall () {
     if(!file) return;
     
     score_count = 0;
-    while(fscanf(file, "%s %d %d %d", ranks[score_count].name, &ranks[score_count].total_score, &ranks[score_count].total_gold, &ranks[score_count].total_games) == 4) {
+    while(fscanf(file, "%s %d %d %d %ld", ranks[score_count].name, &ranks[score_count].total_score, &ranks[score_count].total_gold, &ranks[score_count].total_games, &ranks[score_count].lastgame) == 5) {
         score_count++;
     }
     fclose(file);
@@ -3553,20 +3587,20 @@ void save_scores () {
     //if (!file) return;
     
     for ( int i = 0; i < score_count; i ++) {
-        fprintf(file , "%s %d %d %d\n", ranks[i].name, ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games);
+        fprintf(file , "%s %d %d %d %ld\n", ranks[i].name, ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games, (long)ranks[i].lastgame);
     }
     fclose(file);
 }
 
 void get_score (char* name, int score, int gold) {
-    //time_t current_time = time(NULL);
+    time_t current_time = time(NULL);
     int found = 0;
     for ( int i = 0; i < score_count; i ++) {
         if (strcmp(ranks[i].name, name)== 0) {
             ranks[i].total_score += score;
             ranks[i].total_gold += gold;
             ranks[i].total_games ++;
-            //ranks[i].lastgame = current_time;
+            ranks[i].lastgame = current_time;
             found = 1;
             break;
         }
@@ -3577,7 +3611,7 @@ void get_score (char* name, int score, int gold) {
         ranks[score_count].total_score = score;
         ranks[score_count].total_gold = gold;
         ranks[score_count].total_games = 1;
-       // ranks[score_count].lastgame = current_time;
+        ranks[score_count].lastgame = current_time;
         score_count ++;
     }
     
@@ -3598,7 +3632,7 @@ void hall_of_fame() {
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
     int win_height = score_count + 8;
-    int win_width = 51;
+    int win_width = 67;
     int start_y = (rows - win_height) / 2;
     int start_x = (cols - win_width) / 2;
 
@@ -3606,7 +3640,8 @@ void hall_of_fame() {
     box(hall, 0, 0);
     mvwprintw(hall, 1, (win_width - 11) / 2 - 3, "** HALL OF FAME **");
     wattron(hall, (COLOR_PAIR(6) | A_BOLD));
-    mvwprintw(hall, 3, 2, "RANK      NAME        SCORE  GOLD  GAMES PLAYED");
+    mvwprintw(hall, 3, 2, "%-5s %-10s   %-10s %-6s %-6s %-15s",
+              "RANK", "NAME", "SCORE", "GOLD", "GAMES", "EXPERIENCE");
     wattroff(hall, (COLOR_PAIR(6) | A_BOLD));
     attron(COLOR_PAIR(5));
     const char *message = "== Honor, glory, and a few questionable decisions led these legends here == ";
@@ -3627,10 +3662,14 @@ void hall_of_fame() {
         if (strcmp(ranks[i].name, user_name) == 0) wattron(hall,( COLOR_PAIR(color) | A_BOLD));
         else wattron(hall, COLOR_PAIR(color));
 
+        char lastgame_str[20];
+        struct tm *time_info = localtime(&ranks[i].lastgame);
+        strftime(lastgame_str, sizeof(lastgame_str), "%b %d, %Y", time_info);
+        
         const char *rank_symbol = (i == 0) ? "*" : (i == 1) ? "**" : (i == 2) ? "***" : " ";
-        mvwprintw(hall, 5 + i, 2, "%-3s %d. %-10s %6d %6d %6d",
+        mvwprintw(hall, 5 + i, 2, "%-3s %d. %-10s %6d %6d %6d    %-15s",
                   rank_symbol, i + 1, ranks[i].name,
-                  ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games);
+                  ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games, lastgame_str);
         if (strcmp(ranks[i].name, user_name) == 0) wattroff(hall,( COLOR_PAIR(color) | A_BOLD));
         else wattroff(hall, COLOR_PAIR(color));
     }
@@ -3702,7 +3741,7 @@ void lobby_art () {
       
     getmaxyx(stdscr, rows, cols);
     int start_y = 3;
-    int start_x = 45;
+    int start_x = 53;
     attron(COLOR_PAIR(6));
     mvprintw(start_y++, start_x, "                                                      )         ");
     mvprintw(start_y++, start_x, "                                                        (            ");
@@ -3734,7 +3773,7 @@ void lobby_art () {
     mvprintw(start_y++, start_x, "                                                     ,'-'.");
     mvprintw(start_y++, start_x, "                                                     '---'");
     attroff(COLOR_PAIR(6));
-    start_x = 12;
+    start_x = 5;
     start_y = 3;
     attron(COLOR_PAIR(3));
     mvprintw(start_y++, start_x, "              )         ");
