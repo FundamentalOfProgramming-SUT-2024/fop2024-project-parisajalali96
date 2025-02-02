@@ -108,6 +108,7 @@ struct monster {
     int state;
     int movement_num;
     int movement_state;
+    int level;
 };
 // structs
 
@@ -209,6 +210,41 @@ void main_menu();
 void start_game_menu();
 void show_pop_up (char * , int , char * );
 //prototypes
+
+void reset_game () {
+    locked_door_count = 0;
+    secret_door_count = 0;
+    traps_count = 0;
+    health = 100;
+    hunger = 100;
+    level = 1;
+    food_count = 0;
+    pocket_count = 0;
+    last_health_update = 0;
+    last_hunger_update = 0;
+    gold_count = 0;
+    gold = 0;
+    score = 0;
+    weapon_count = 0;
+    wield_choice = 1;
+    potion_count = 0;
+    for (int i = 0; i < 10; i++) {
+        room_count[i] = 0;
+    }
+    g_state = 0;
+
+    monster_count = 0;
+
+    //strcpy(user_name,"Guest_Player");
+    hits = 0;
+    potion_time_track = 0;
+    food_time_out = 50;
+    weapon_rate = 1;
+    num_of_blocks = 1;
+    drank_potion = false;
+    ate_magic_food = false;
+    difficulty_coeff = 1;
+}
 
 void pick_one (int highlight, char* menu_name, char * options[], int n) {
     attron(COLOR_PAIR(1));
@@ -762,6 +798,7 @@ void add_monster (struct ROOM room) {
                 monsters[monster_count].num = 4;
             }
             if (rand () % prob == 0 && map[y][x] == '.') {
+                monsters[monster_count].level = level;
                 monsters[monster_count].x = x;
                 monsters[monster_count].y = y;
                 monsters[monster_count].type = symbol;
@@ -1009,10 +1046,17 @@ void show_password(int px, int py) {
         password_show_time = time(NULL);
     }
 
+    int rows, cols;
+    getmaxyx(stdscr, rows, cols);
+
     int win_width = 30;
     int win_height = 8;
-    WINDOW *password_win = newwin(win_height, win_width, py - 2, px + 2);
-    
+
+    int start_x = (cols - win_width) / 2;
+    int start_y = (rows - win_height) / 2;
+
+    WINDOW *password_win = newwin(win_height, win_width, start_y, start_x);
+
     wbkgd(password_win, COLOR_PAIR(7));
     box(password_win, 0, 0);
 
@@ -1030,7 +1074,7 @@ void show_password(int px, int py) {
         mvwprintw(password_win, 3, start_col1, "%s", msg1);
 
         mvwprintw(password_win, 4, start_col2, "%s%s", msg2, password);
-        
+
         time_passed = (int)difftime(time(NULL), password_show_time);
 
         napms(100);
@@ -1046,29 +1090,33 @@ void show_password(int px, int py) {
 
 int lock_pass_input(int px, int py) {
     int which_door = 0;
-    for (int c = 0; c < locked_door_count; c ++ ) {
+    for (int c = 0; c < locked_door_count; c++) {
         if (locked[c].x == px && locked[c].y == py) {
             which_door = c;
         }
     }
     if (locked[which_door].state == 1) return which_door;
+
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
 
     int win_width = 30;
     int win_height = 8;
+
+    int start_x = (cols - win_width) / 2;
+    int start_y = (rows - win_height) / 2;
+
     char is_pass[5];
-    WINDOW *password_win = newwin(win_height, win_width, py - 2, px + 2);
-    
+    WINDOW *password_win = newwin(win_height, win_width, start_y, start_x);
     wbkgd(password_win, COLOR_PAIR(7));
     box(password_win, 0, 0);
-    
+
     echo();
-    char msg1 [] = "Knock Knock! Who's there?";
+    char msg1[] = "Knock Knock! Who's there?";
     int msg1_len = strlen(msg1);
     int start_col1 = (win_width - msg1_len) / 2;
 
-    char msg2 [] = "The password, please!: ";
+    char msg2[] = "The password, please!: ";
     int msg2_len = strlen(msg2);
     int start_col2 = (win_width - msg2_len) / 2;
     mvwprintw(password_win, 3, start_col1, "%s", msg1);
@@ -1082,9 +1130,7 @@ int lock_pass_input(int px, int py) {
         is_pass[len - 1] = '\0';
     }
 
- 
-
-    if (strcmp(password, is_pass) == 0 ) {
+    if (strcmp(password, is_pass) == 0) {
         locked[which_door].state = 1;
         messages("door opened", 0);
         attron(COLOR_PAIR(2));
@@ -1093,13 +1139,13 @@ int lock_pass_input(int px, int py) {
         attroff(COLOR_PAIR(2));
         refresh();
     } else {
-        WINDOW * warning_1 = newwin(win_height, win_width, py - 2, px + 2);
+        WINDOW *warning_1 = newwin(win_height, win_width, start_y, start_x);
         wbkgd(warning_1, COLOR_PAIR(11));
         box(warning_1, 0, 0);
-        char msg4 [] = "WARNING! Try again!";
+        char msg4[] = "WARNING! Try again!";
         int msg4_len = strlen(msg4);
         int start_col4 = (win_width - msg4_len) / 2;
-        
+
         mvwprintw(warning_1, 3, start_col4, "%s", msg4);
         echo();
         mvwgetstr(warning_1, 5, start_col4, is_pass);
@@ -1111,18 +1157,18 @@ int lock_pass_input(int px, int py) {
         }
         wrefresh(warning_1);
         delwin(warning_1);
-        
-        if (strcmp(password, is_pass) == 0 ) {
+
+        if (strcmp(password, is_pass) == 0) {
             locked[which_door].state = 1;
             messages("door opened", 0);
         } else {
-            WINDOW * warning_2 = newwin(win_height, win_width, py - 2, px + 2);
+            WINDOW *warning_2 = newwin(win_height, win_width, start_y, start_x);
             wbkgd(warning_2, COLOR_PAIR(8));
             box(warning_2, 0, 0);
-            char msg5 [] = "WARNING! Last Try!";
+            char msg5[] = "WARNING! Last Try!";
             int msg5_len = strlen(msg5);
             int start_col5 = (win_width - msg5_len) / 2;
-            
+
             mvwprintw(warning_2, 3, start_col5, "%s", msg5);
             echo();
             mvwgetstr(warning_2, 5, start_col5, is_pass);
@@ -1134,29 +1180,30 @@ int lock_pass_input(int px, int py) {
             }
             wrefresh(warning_2);
             delwin(warning_2);
-            
-            if (strcmp(password, is_pass) == 0 ) {
+
+            if (strcmp(password, is_pass) == 0) {
                 locked[which_door].state = 1;
                 messages("door opened", 0);
             } else {
-                WINDOW * warning_3 = newwin(win_height, win_width, py - 2, px + 2);
+                WINDOW *warning_3 = newwin(win_height, win_width, start_y, start_x);
                 wbkgd(warning_3, COLOR_PAIR(8));
                 box(warning_3, 0, 0);
-                char msg6 [] = "WARNING! Security Lockdown!";
+                char msg6[] = "WARNING! Security Lockdown!";
                 int msg6_len = strlen(msg6);
                 int start_col6 = (win_width - msg6_len) / 2;
-                
+
                 mvwprintw(warning_3, 3, start_col6, "%s", msg6);
                 wrefresh(warning_3);
                 getch();
                 delwin(warning_3);
             }
-            
+
         }
-        
+
     }
     return which_door;
 }
+
 
 void locked_door (struct ROOM room) {
     int door_x [100], door_y [100];
@@ -1355,7 +1402,7 @@ void player_attack (int mx, int my, char type) {
     else if (type == '!') damage = weapon_rate*10;
 
     for (int i = 0; i < monster_count; i ++) {
-        if (monsters[i].x == mx && monsters[i].y == my) {
+        if (monsters[i].state == 0 && monsters[i].level == level && monsters[i].x == mx && monsters[i].y == my) {
             if (type == '~') {
                 monsters[i].movement_state = 1;
                 messages("monster frozen", i);
@@ -1390,7 +1437,7 @@ struct ROOM which_room (int px, int py) {
 void while_inside_room (int px, int py, struct ROOM room) {
     
     for ( int i = 0; i < monster_count; i ++) {
-        if (monsters[i].state == 0 && (monsters[i].x >= room.x && monsters[i].x <= room.x + room.width) && (monsters[i].y >= room.y && monsters[i].y <= room.y + room.height) && room.type != 1) {
+        if (monsters[i].level == level && monsters[i].state == 0 && (monsters[i].x >= room.x && monsters[i].x <= room.x + room.width) && (monsters[i].y >= room.y && monsters[i].y <= room.y + room.height) && room.type != 1) {
             if (monsters[i].type == 'G' || monsters[i].type == 'S' || monsters[i].type == 'U') {
                 monster_move(px, py, &monsters[i]);
             }
@@ -1709,7 +1756,7 @@ struct monster monster_in_room (int px, int py ) {
     monster.y = -1;
 
     for ( int i = 0; i < monster_count; i ++) {
-        if ((monsters[i].x == px || monsters[i].x == px + 1 || monsters[i].x == px - 1) && ( monsters[i].y == py || monsters[i].y == py + 1 || monsters[i].y == py - 1)) {
+        if (monsters[i].state == 0 && monsters[i].level == level && (monsters[i].x == px || monsters[i].x == px + 1 || monsters[i].x == px - 1) && ( monsters[i].y == py || monsters[i].y == py + 1 || monsters[i].y == py - 1)) {
             return monsters[i];
         }
     }
@@ -2716,7 +2763,6 @@ void end_game(char state) {
 
     calculate_score();
     get_score(user_name, score, gold);
-    load_hall();
     hall_of_fame();
 }
 
@@ -2994,7 +3040,7 @@ void generate_map (){
                 } else {
                     long_range_weapon = false;
                     struct monster mon = monster_in_room(px, py);
-                    if (mon.x != -1 && mon.y != -1 && mon.state == 0) {
+                    if (mon.x != -1 && mon.y != -1) {
                         player_attack(mon.x, mon.y, weapon_in_hand->symbol);
                     } else messages("no monster", 0);
                 }
@@ -3268,6 +3314,7 @@ void start_game_menu() {
         else if (ch == KEY_DOWN && choice < num_options - 1) choice++;
         else if (ch == '\n') {
             if (choice == 0) { // New Game
+                reset_game();
                 init_map();
                 generate_map();
                 getch();
@@ -3502,7 +3549,7 @@ void play_menu() {
             } else if (choice == 1) {
                 //clear();
                 get_info("Enter username: ", username, 50, 0);
-                strcpy(user_name, username);
+                //strcpy(user_name, username);
                 get_info("Enter password: ", password, 50, 1);
                 
                 if (validate_username(username, password)) {
@@ -3510,6 +3557,7 @@ void play_menu() {
                     lobby_art();
                     refresh();
                     //printw("\nLogin successful!");
+                    strcpy(user_name, username);
                     start_game_menu();
                 } else {
                     show_pop_up("Invalid password!", 1, 0);
@@ -3583,16 +3631,52 @@ void load_hall () {
 }
 
 void save_scores () {
-    FILE * file = fopen("hall_of_fame.txt", "a");
-    //if (!file) return;
+    FILE *file = fopen("hall_of_fame.txt", "r");
+    struct scores temp_ranks[20];
+    int temp_count = 0;
+    int found[20] = {0};
     
-    for ( int i = 0; i < score_count; i ++) {
-        fprintf(file , "%s %d %d %d %ld\n", ranks[i].name, ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games, (long)ranks[i].lastgame);
+    if (file) {
+        while (fscanf(file, "%s %d %d %d %ld", temp_ranks[temp_count].name,
+                      &temp_ranks[temp_count].total_score,
+                      &temp_ranks[temp_count].total_gold,
+                      &temp_ranks[temp_count].total_games,
+                      &temp_ranks[temp_count].lastgame) == 5) {
+            temp_count++;
+        }
+        fclose(file);
     }
+    
+    for (int i = 0; i < score_count; i++) {
+        int updated = 0;
+        for (int j = 0; j < temp_count; j++) {
+            if (strcmp(ranks[i].name, temp_ranks[j].name) == 0) {
+                temp_ranks[j] = ranks[i];
+                found[j] = 1;
+                updated = 1;
+                break;
+            }
+        }
+        if (!updated && temp_count < 20) {
+            temp_ranks[temp_count++] = ranks[i];
+        }
+    }
+    
+    file = fopen("hall_of_fame.txt", "w");
+    if (!file) return;
+    
+    for (int i = 0; i < temp_count; i++) {
+        fprintf(file, "%s %d %d %d %ld\n", temp_ranks[i].name,
+                temp_ranks[i].total_score, temp_ranks[i].total_gold,
+                temp_ranks[i].total_games, temp_ranks[i].lastgame);
+    }
+    
     fclose(file);
+
 }
 
 void get_score (char* name, int score, int gold) {
+    load_hall();
     time_t current_time = time(NULL);
     int found = 0;
     for ( int i = 0; i < score_count; i ++) {
@@ -3632,7 +3716,7 @@ void hall_of_fame() {
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
     int win_height = score_count + 8;
-    int win_width = 67;
+    int win_width = 70;
     int start_y = (rows - win_height) / 2;
     int start_x = (cols - win_width) / 2;
 
@@ -3659,6 +3743,8 @@ void hall_of_fame() {
     
     for (int i = 0; i < score_count; i++) {
         int color = (i == 0) ? 5 : (i == 1) ? 6 : (i == 2) ? 4 : 10;
+        char title [30]= "";
+        if (i >= 0 && i <= 2) strcpy(title, "LEGEND");
         if (strcmp(ranks[i].name, user_name) == 0) wattron(hall,( COLOR_PAIR(color) | A_BOLD));
         else wattron(hall, COLOR_PAIR(color));
 
@@ -3667,8 +3753,8 @@ void hall_of_fame() {
         strftime(lastgame_str, sizeof(lastgame_str), "%b %d, %Y", time_info);
         
         const char *rank_symbol = (i == 0) ? "*" : (i == 1) ? "**" : (i == 2) ? "***" : " ";
-        mvwprintw(hall, 5 + i, 2, "%-3s %d. %-10s %6d %6d %6d    %-15s",
-                  rank_symbol, i + 1, ranks[i].name,
+        mvwprintw(hall, 5 + i, 2, "%s %-3s %d. %-10s %6d %6d %6d    %-15s",
+                  title,rank_symbol, i + 1, ranks[i].name,
                   ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games, lastgame_str);
         if (strcmp(ranks[i].name, user_name) == 0) wattroff(hall,( COLOR_PAIR(color) | A_BOLD));
         else wattroff(hall, COLOR_PAIR(color));
