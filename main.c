@@ -2317,7 +2317,9 @@ void add_gold (struct ROOM room) {
 }
 
 void elixir_of_everlife () {
-    health_update(1);
+   // health_update(1);
+    health += 10;
+    health_bar(health);
 }
 
 void dragon_blood () {
@@ -2593,57 +2595,124 @@ void get_game_name (char * save_name) {
     show_pop_up("Your game was successfully saved!", 0, 0);
 }
 
- 
-void end_game (char state) {
+void lose_art () {
+    int rows, cols;
+      
+    getmaxyx(stdscr, rows, cols);
+    int start_y = 6;
+    int start_x = 25;
+    attron(COLOR_PAIR(10));
+    mvprintw(start_y++, start_x, "                                 _____  _____");
+    mvprintw(start_y++, start_x, "                                <     `/     |");
+    mvprintw(start_y++, start_x, "                                 >          (");
+    mvprintw(start_y++, start_x, "                                |   _     _  |");
+    mvprintw(start_y++, start_x, "                                |  |_) | |_) |");
+    mvprintw(start_y++, start_x, "                                |  | \\ | |   |");
+    mvprintw(start_y++, start_x, "                 ______.________|            |__________  _____");
+    mvprintw(start_y++, start_x, "               _/                                       \\|     |");
+    attroff(COLOR_PAIR(10));
+    attron(COLOR_PAIR(6));
+    mvprintw(start_y++, start_x, "              |                   %-20.20s                    ", user_name);
+    attroff(COLOR_PAIR(6));
+    mvprintw(start_y++, start_x, "              |_____.-._________              ____/|___________|");
+    mvprintw(start_y++, start_x, "                                |            |");
+    mvprintw(start_y++, start_x, "                                |  01/06/85  |");
+    mvprintw(start_y++, start_x, "                                |            |");
+    mvprintw(start_y++, start_x, "                                |            |");
+    mvprintw(start_y++, start_x, "                                |   _        <");
+    mvprintw(start_y++, start_x, "                                |__/         |");
+    mvprintw(start_y++, start_x, "                                 / `--.      |");
+    attron(COLOR_PAIR(9));
+    mvprintw(start_y++, start_x, "                                %|            |%");
+    mvprintw(start_y++, start_x, "                            |/.%%|          -< @%%%");
+    mvprintw(start_y++, start_x, "                             `\%`@|     v      |@@%@%%    ");
+    mvprintw(start_y++, start_x, "                           .%%%@@@|%    |    % @@@%%@%%%%");
+    mvprintw(start_y++, start_x, "                      _.%%%%%%@@@@@@%%_/%\\_%@@%%@@@@@@@%%%%%%");
+    attroff(COLOR_PAIR(9));
+    
+    refresh();
+}
+
+void win_art () {
+    int rows, cols;
+      
+    getmaxyx(stdscr, rows, cols);
+    int start_y = 3;
+    int start_x = 45;
+    attron(COLOR_PAIR(2));
+    mvprintw(start_y++, start_x, "                          ==(W{==========-      /===-");
+    mvprintw(start_y++, start_x, "                            ||  (.--.)         /===-_---~~~~~~~~~------____");
+    mvprintw(start_y++, start_x, "                            | \\_,|**|,__      |===-~___                _,-'`");
+    mvprintw(start_y++, start_x, "               -==\\\\        `\\ ' `--'   ),    `//~\\\\   ~~~~`---.___.-~~");
+    mvprintw(start_y++, start_x, "             ______-==|        /`\\_. .__/\\ \\    | |  \\\\           _-~`");
+    mvprintw(start_y++, start_x, "       __--~~~  ,-/-==\\\\      (   | .  |~~~~|   | |   `\\        ,'");
+    mvprintw(start_y++, start_x, "    _-~       /'    |  \\\\     )__/==0==-\\<>/   / /      \\      /");
+    mvprintw(start_y++, start_x, "  .'        /       |   \\\\      /~\\___/~~\\/  /' /        \\   /'");
+    mvprintw(start_y++, start_x, " /  ____  /         |    \\`\\.__/-~~   \\  |_/'  /          \\/'");
+    mvprintw(start_y++, start_x, "/-'~    ~~~~~---__  |     ~-/~         ( )   /'        _--~`");
+    mvprintw(start_y++, start_x, "                  \\_|      /        _) | ;  ),   __--~~");
+    mvprintw(start_y++, start_x, "                    '~~--_/      _-~/- |/ \\   '-~ \\");
+    mvprintw(start_y++, start_x, "                   {\\__--_/}    / \\\\_>-|)<__\\      \\");
+    mvprintw(start_y++, start_x, "                   /'   (_/  _-~  | |__>--<__|      |");
+    mvprintw(start_y++, start_x, "                  |   _/) )-~     | |__>--<__|      |");
+    mvprintw(start_y++, start_x, "                  / /~ ,_/       / /__>---<__/      |");
+    mvprintw(start_y++, start_x, "                 o-o _//        /-~_>---<__-~      /");
+    mvprintw(start_y++, start_x, "                 (^(~          /~_>---<__-      _-~");
+    mvprintw(start_y++, start_x, "                ,/|           /__>--<__/     _-~");
+    mvprintw(start_y++, start_x, "             ,//('(          |__>--<__|     /                  .----_");
+    mvprintw(start_y++, start_x, "            ( ( '))          |__>--<__|    |                 /' _---_~\\");
+    mvprintw(start_y++, start_x, "         `-)) )) (           |__>--<__|    |                   /'  /     ~\\`\\");
+    mvprintw(start_y++, start_x, "        ,/,'//( (             \\__>--<__\\    \\            /'  //        ||");
+    mvprintw(start_y++, start_x, "      ,( ( ((, ))              ~-__>--<_~-_  ~--____---~' _/'/        /'");
+    mvprintw(start_y++, start_x, "    `~/  )` ) ,/|                 ~-_~>--<_/-__       __-~ _/");
+    mvprintw(start_y++, start_x, "  ._-~//( )/ )) `                    ~~-'_/_/ /~~~~~~~__--~");
+    mvprintw(start_y++, start_x, "   ;'( ')/ ,)(                              ~~~~~~~~~~");
+    mvprintw(start_y++, start_x, "  ' ') '( (/");
+    attroff(COLOR_PAIR(2));
+    
+    refresh();
+}
+void end_game(char state) {
+    clear();
+    refresh();
+
+    int height = 12, width = 40;
+    int rows, cols;
+    getmaxyx(stdscr, rows, cols);
+    
+    if (state == 'w') win_art();
+    else lose_art();
+    int x = 10;
+    int z = 5;
+    int color = 10;
+    if (state == 'w') color = 9;
+    else color = 2;
+    attron(COLOR_PAIR(color) | A_BOLD);
+    if (state == 'w') mvprintw(2+x, 12, "== YOU WIN! ==");
+    else mvprintw(2, (cols - strlen("== YOU LOSE! =="))/2, "== YOU LOSE! ==");
+    attroff(COLOR_PAIR(color) | A_BOLD);
+
     if (state == 'w') {
-        clear();
-        refresh();
-        int start_y = (LINES - 10) / 2;
-        int start_x = (COLS - 50) / 2;
-        WINDOW * winner = newwin(10, 50, start_y, start_x);
-        wbkgd(winner, COLOR_PAIR(12));
-        box(winner, 0, 0);
-   
-        
-        char msg [20] = "YOU WIN!";
-        mvwprintw(winner, 2, (50 - strlen(msg)) / 2, "%s", msg);
-        mvwprintw(winner, 4, 2, "%s", "With the treasure in your hands and the dungeon");
-        mvwprintw(winner, 5, 2, "%s", "fading behind, you emerge victorious at last!");
-        mvprintw(7, 2, "Press any key to enter Hall of Fame!");
-        wrefresh(winner);
-        getch();
-        delwin(winner);
-        //save_game(1, 1);
-        calculate_score();
-        get_score(user_name, score, gold);
-        load_hall();
-        hall_of_fame();
-        
+        attron(COLOR_PAIR(5));
+        mvprintw(4 +x, 2 + z, "With the treasure in your hands,");
+        mvprintw(5 +x, 2 +z, "the dungeon fades behind as you emerge victorious!");
+        attroff(COLOR_PAIR(5));
     } else {
-        clear();
-        refresh();
-        int start_y = (LINES - 10) / 2;
-        int start_x = (COLS - 50) / 2;
-        WINDOW * loser = newwin(10, 50, start_y, start_x);
-        wbkgd(loser, COLOR_PAIR(8));
-        box(loser, 0, 0);
-   
-        
-        char msg [20] = "YOU LOSE!";
-        mvwprintw(loser, 2, (50 - strlen(msg)) / 2, "%s", msg);
-        mvwprintw(loser, 4, 2, "%s", "Darkness consumes you as you fall...");
-        mvwprintw(loser, 5, 2, "%s", "The dungeon claims another soul.");
-        mvprintw(7, 2, "Press any key to enter Hall of Fame!");
-        
-        wrefresh(loser);
-        getch();
-        delwin(loser);
-        //save_game(1, 1);
-        calculate_score();
-        load_hall();
-        get_score(user_name, score, gold);
-        hall_of_fame();
+        attron(COLOR_PAIR(5));
+        mvprintw(3, (cols - strlen("Darkness consumes you as you fall...")) / 2, "Darkness consumes you as you fall...");
+        mvprintw(4, (cols - strlen("The dungeon claims another soul."))/2, "The dungeon claims another soul.");
+        attroff(COLOR_PAIR(5));
     }
+
+    //mvprintw(7+x, 2+z, "Press any key to enter Hall of Fame!");
+
+    refresh();
+    getch();
+
+    calculate_score();
+    get_score(user_name, score, gold);
+    load_hall();
+    hall_of_fame();
 }
 
 void resume_save_window (int px, int py) {
@@ -3744,7 +3813,6 @@ void load_welcome_page() {
 
 }
 
-
 int main() {
     initscr();
     setlocale(LC_ALL, "en_US.UTF-8");
@@ -3757,7 +3825,6 @@ int main() {
         start_color();
         init_colors();
     }
-    
     load_welcome_page();
     clear();
     lobby_art();
