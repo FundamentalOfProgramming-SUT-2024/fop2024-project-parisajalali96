@@ -1408,8 +1408,8 @@ void player_attack (int mx, int my, char type) {
                 messages("monster frozen", i);
             }
             monsters[i].health -= damage;
-            monster_health_check(&monsters[i]);
             messages("player attack", i);
+            monster_health_check(&monsters[i]);
             if (monsters[i].state) {
                 map[my][mx] = '.';
                 messages("monster dead", i);
@@ -1637,69 +1637,75 @@ void drop_weapon (int x, int y, struct weapon * weapon) {
 }
 
 
-void dagger_wand_arrow_attack (int px, int py, char * direction, int type) {
+void dagger_wand_arrow_attack(int px, int py, char *direction, int type) {
     int distance;
     char symbol;
-    if (type == 0) {
+    
+    if (type == 0) {  // Dagger
         distance = 5;
         symbol = 'd';
-    } else if (type == 1) {
+    } else if (type == 1) {  // Wand
         distance = 10;
         symbol = '~';
-    } else {
+    } else {  // Arrow
         distance = 5;
         symbol = 'a';
     }
+
     int dx = 0, dy = 0;
     
     if (strcmp(direction, "u") == 0) dy = -1;
     else if (strcmp(direction, "d") == 0) dy = +1;
     else if (strcmp(direction, "l") == 0) dx = -1;
     else if (strcmp(direction, "r") == 0) dx = +1;
-    else if (strcmp(direction, "ur") == 0) {
-        dx = +1;
-        dy = -1;
-    } else if (strcmp(direction, "ul") == 0) {
-        dx = -1;
-        dy = -1;
-    } else if (strcmp(direction, "dl") == 0) {
-        dx = -1;
-        dy = +1;
-    } else if (strcmp(direction, "dr") == 0) {
-        dx = +1;
-        dy = +1;
-    }
+    else if (strcmp(direction, "ur") == 0) { dx = +1; dy = -1; }
+    else if (strcmp(direction, "ul") == 0) { dx = -1; dy = -1; }
+    else if (strcmp(direction, "dl") == 0) { dx = -1; dy = +1; }
+    else if (strcmp(direction, "dr") == 0) { dx = +1; dy = +1; }
+
     bool weapon_used = false;
-    for (int i = 0; i < distance; i ++) {
-        if (map[py + i * dy][px + i * dx] == '|' || map[py + i * dy][px + i * dx] == '-') {
-            drop_weapon(px + (i-1) * dx, py + (i-1) * dy, weapon_in_hand);
-            messages("weapon drop", type);
+
+    for (int i = 1; i <= distance; i++) {
+        int new_x = px + i * dx;
+        int new_y = py + i * dy;
+
+        if (new_x < 0 || new_x >= WIDTH || new_y < 0 || new_y >= HEIGHT) {
+            drop_weapon(px + (i - 1) * dx, py + (i - 1) * dy, weapon_in_hand);
             return;
         }
-        for ( int j = 0; j < monster_count; j ++) {
-            if ((monsters[j].x == px + i * dx) && (monsters[j].y == py + i * dy)) {
+
+        if (map[new_y][new_x] == '|' || map[new_y][new_x] == '-' || map[new_y][new_x] == '#') {
+            drop_weapon(px + (i - 1) * dx, py + (i - 1) * dy, weapon_in_hand);
+            return;
+        }
+
+        for (int j = 0; j < monster_count; j++) {
+            if (monsters[j].x == new_x && monsters[j].y == new_y) {
                 player_attack(monsters[j].x, monsters[j].y, symbol);
                 weapon_used = true;
                 return;
             }
         }
-        
     }
+
     if (!weapon_used) {
         drop_weapon(px + distance * dx, py + distance * dy, weapon_in_hand);
-        messages("weapon drop", type);
     }
-    strcpy(last_direction, direction);
+
+    strncpy(last_direction, direction, sizeof(last_direction) - 1);
+    last_direction[sizeof(last_direction) - 1] = '\0';
+
     long_range_weapon = true;
 }
-void a_command (int px, int py) {
+
+/*void a_command (int px, int py) {
     int type;
     if( weapon_in_hand->symbol == 'd') type = 0;
     else if( weapon_in_hand->symbol == '~') type = 1;
     else if( weapon_in_hand->symbol == 'a') type = 2;
 
     dagger_wand_arrow_attack(px, py, last_direction, type);
-}
+}*/
 void display_hits () {
     attron(COLOR_PAIR(2));
     mvprintw(LINES -1, COLS/2 + 12 - 55, "Hits: %d", hits);
@@ -1989,18 +1995,21 @@ void food_window () {
 }
 
 
-void weapon_in_bag () {
+void weapon_in_bag() {
     weapon_in_hand->state = 0;
     wield_choice = '0';
 }
-void weapon_choice (char symbol) {
 
-    weapon_in_hand->state = 0;
-    
-    for ( int i = 0; i < weapon_count; i ++) {
+void weapon_choice(char symbol) {
+    if (weapon_in_hand->symbol == symbol) return;
+
+    weapon_in_bag();
+
+    for (int i = 0; i < weapon_count; i++) {
         if (weapons[i].symbol == symbol && weapons[i].state == 0) {
-            weapons[i].state =1;
+            weapons[i].state = 1;
             weapon_in_hand = &weapons[i];
+            wield_choice = symbol;
             break;
         }
     }
@@ -2111,16 +2120,16 @@ void weapon_window() {
     int choice = wgetch(arsenal);
     if (wield_choice != '0') {
         messages("put in bag", 0);
+        delwin(arsenal);
         return;
     }
-    if (choice == 'm') weapon_choice('m');
-    else if (choice == 'd') weapon_choice('d');
-    else if (choice == '!') weapon_choice('!');
-    else if (choice == '~') weapon_choice('~');
-    else if (choice == 'a') weapon_choice('a');
-    wield_choice = choice;
-    messages("took weapon", 0);
+    if (choice == 'm' || choice == 'd' || choice == '!' || choice == '~' || choice == 'a') {
+        weapon_choice(choice);
+        wield_choice = choice;
+        messages("took weapon", 0);
+    }
     delwin(arsenal);
+    refresh();
 }
 
 void potion_choice (int type) {
@@ -2139,7 +2148,7 @@ void potion_choice (int type) {
     potion_time_track = 10;
 }
 void potion_window () {
-    int height = 10, width = 40;
+    int height = 12, width = 40;
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
     int start_y = (rows - height) / 2;
@@ -2311,7 +2320,9 @@ void add_weapon (struct ROOM room) {
             }
         }
     }
-    weapon_in_hand = &weapons[0];
+    if (level == 1) {
+        weapon_in_hand = &weapons[0];
+    }
 }
 
 void picked_tresure () {
@@ -3014,15 +3025,16 @@ void generate_map (){
             messages("weapon in bag", weapon_in_hand->symbol);
             weapon_in_bag();
         } else if (ch == 'a') {
-            if (long_range_weapon) a_command(px, py);
-            else messages("no long range weapon", 0);
+            //if (long_range_weapon) a_command(px, py);
+           // else messages("no long range weapon", 0);
         }
         else if (ch == ' ') {
             if (weapon_in_hand) {
                 if ((weapon_in_hand->symbol == 'd' || weapon_in_hand->symbol == '~' || weapon_in_hand->symbol == 'a')) {
                     long_range_weapon = true;
+                    mvprintw(0, 0, "Choose a direction to throw the weapon!");
                     int direction = getch();
-                    char dir[3];
+                    char dir[3] = {0};
                     int type = 0;
                     if (direction == KEY_UP) strcpy(dir, "u");
                     else if (direction == KEY_DOWN) strcpy(dir, "d");
@@ -3764,6 +3776,8 @@ void hall_of_fame() {
     //mvprintw(0, 0, "Press any key to return.");
     getch();
     delwin(hall);
+    clear();
+    start_game_menu();
 }
 
 void main_menu() {
