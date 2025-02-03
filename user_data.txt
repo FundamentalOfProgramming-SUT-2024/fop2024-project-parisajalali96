@@ -10,3 +10,6 @@ Email: hediyeh65@gmail.com
 Username: narges
 Password: Nar898765
 Email: narges78@gmail.com
+Username: Rick
+Password: Rg12345
+Email: rickgrimes@gmail.com
