@@ -323,7 +323,7 @@ void messages(char *what_happened, int maybe) {
     } else if (strcmp(what_happened, "picked up potion") == 0) {
         char name [20];
         if (maybe == 0) strcpy(name, "Elixir of Everlife");
-        else if (maybe == 1) strcpy(name, "Dragon's Blood");
+        else if (maybe == 2) strcpy(name, "Dragon's Blood");
         else strcpy(name, "Stormrider's Kiss");
 
         printw("You picked up The %s!", name);
@@ -1289,7 +1289,7 @@ void pick_up (int y, int x) {
         pocket[pocket_count].name = "food";
         int food_index = 0;
         for ( int i = 0; i < food_count; i ++) {
-            if (foods[i].x == x && foods[i].y == y) {
+            if (foods[i].state == -1 && foods[i].x == x && foods[i].y == y) {
                 food_index = i;
                 foods[i].state = 0;
 
@@ -1304,7 +1304,7 @@ void pick_up (int y, int x) {
         pocket[pocket_count].name = "gold";
         int gold_type = 0;
         for ( int i = 0; i < gold_count; i ++) {
-            if (golds[i].x == x && golds[i].y == y) {
+            if (golds[i].state == -1 && golds[i].x == x && golds[i].y == y) {
                 gold_type = golds[i].type;
                 golds[i].state = 0;
 
@@ -1321,7 +1321,7 @@ void pick_up (int y, int x) {
         int num = 1;
         int type = 1;
         for ( int i = 0; i < weapon_count; i ++) {
-            if (weapons[i].x == x && weapons[i].y == y) {
+            if (weapons[i].state == -1 && weapons[i].x == x && weapons[i].y == y) {
                 symbol = weapons[i].symbol;
                 if (symbol == 'm') type = 1;
                 else if (symbol == 'd') {
@@ -1348,7 +1348,7 @@ void pick_up (int y, int x) {
         map[y][x] = '.';
         pocket[pocket_count].x = x;
         pocket[pocket_count].y = y;
-        pocket[pocket_count].name = "potions";
+        pocket[pocket_count].name = "potion";
         int type = 0;
         for ( int i = 0; i < potion_count; i ++) {
             if (potions[i].x == x && potions[i].y == y) {
@@ -2133,10 +2133,11 @@ void weapon_window() {
 }
 
 void potion_choice (int type) {
+
     
     for ( int i = 0; i < potion_count; i ++) {
         if (potions[i].type == type && potions[i].state == 0) {
-            potions[i].state =1;
+            potions[i].state = 1;
             messages("took potion", type);
             drank_potion = true;
             break;
@@ -2146,6 +2147,7 @@ void potion_choice (int type) {
     else if (type == 1) storm_kiss();
     else dragon_blood();
     potion_time_track = 10;
+        
 }
 void potion_window () {
     int height = 12, width = 40;
@@ -2164,23 +2166,20 @@ void potion_window () {
     int elix = 0, drag = 0, kiss = 0;
     for (int i = 0; i < potion_count; i++) {
         if (potions[i].type == 0 && potions[i].state == 0) elix++;
-        if (potions[i].type == 1 && potions[i].state == 0) drag++;
-        if (potions[i].type == 2 && potions[i].state == 0) kiss++;
+        if (potions[i].type == 2 && potions[i].state == 0) drag++;
+        if (potions[i].type == 1 && potions[i].state == 0) kiss++;
     }
     
-    int elix_id = 0, drag_id = 0, kiss_id = 0;
+    //int elix_id = 0, drag_id = 0, kiss_id = 0;
     int identifier = 1;
     if (elix != 0) {
-        mvwprintw(potion, identifier + 1, 1, "%d. %d Elixir of Everlife", identifier, elix);
-        elix_id = identifier++;
+        mvwprintw(potion, identifier++ , 1, "[e] %d Elixir of Everlife", elix);
     }
     if (drag != 0) {
-        mvwprintw(potion, identifier + 1, 1, "%d. %d Dragon's Blood", identifier, drag);
-        drag_id = identifier++;
+        mvwprintw(potion, identifier++ + 1, 1, "[d] %d Dragon's Blood", drag);
     }
     if (kiss != 0) {
-        mvwprintw(potion, identifier + 1, 1, "%d. %d Stormrider's Kiss", identifier, kiss);
-        kiss_id = identifier++;
+        mvwprintw(potion, identifier++ + 1, 1, "[s] %d Stormrider's Kiss", kiss);
     }
     if (elix == 0 && drag == 0 && kiss == 0) {
         char text[] = "You don't have any potions to drink!";
@@ -2189,11 +2188,11 @@ void potion_window () {
     }
 
     wrefresh(potion);
-    int choice = wgetch(potion) - '0';
+    int choice = wgetch(potion);
 
-    if (choice == elix_id) potion_choice(0);
-    else if (choice == drag_id) potion_choice(2);
-    else if (choice == kiss_id) potion_choice(1);
+    if (choice == 'e') potion_choice(0);
+    else if (choice == 'd') potion_choice(2);
+    else if (choice == 's') potion_choice(1);
     delwin(potion);
 }
 
@@ -2398,8 +2397,8 @@ void storm_kiss () {
 }
 void add_potion (struct ROOM room) {
     int prob;
-    int type = room.type;
-    if (type == 1) prob = 10;
+    int room_type = room.type;
+    if (room_type == 1) prob = 10;
     else prob = 50;
     for (int y = room.y; y < room.y + room.height; y++) {
        // if (food_count >= MAX_FOOD) break;
@@ -2989,6 +2988,7 @@ void generate_map (){
             num_of_blocks = 1;
             if (drank_potion) messages("potion time over", 0);
             drank_potion = false;
+            ate_magic_food = false;
         }
         if (ch == KEY_UP || ch == 'J') ny -= num_of_blocks;
         else if (ch == KEY_DOWN || ch == 'K') ny+= num_of_blocks;
