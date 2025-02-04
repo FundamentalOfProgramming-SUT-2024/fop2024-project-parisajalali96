@@ -122,7 +122,7 @@ bool trap_visible[HEIGHT][WIDTH];
 struct scores ranks [MAX_SIZE];
 int score_count = 0;
 
-int hero_color = 1;
+int hero_color = 10;
 char password[LOCKED_PASS_LEN + 1];
 time_t password_show_time = 0;
 
@@ -3323,10 +3323,73 @@ void setting_menu() {
     delwin(menu_win);
 }
 
+void show_profile () {
+    char name[50];
+    int total_score = 0, total_gold = 0, games_played = 0;
+    char buffer[256];
+    FILE *file = fopen("hall_of_fame.txt", "r");
+    
+    int found = 0;
+    while (fgets(buffer, sizeof(buffer), file)) {
+        sscanf(buffer, "%s %d %d %d", name, &total_score, &total_gold, &games_played);
+        if (strcmp(name, user_name) == 0) {
+            found = 1;
+            break;
+        }
+    }
+    fclose(file);
+    
+    int height = 15, width = 50;
+    int rows, cols;
+    
+    getmaxyx(stdscr, rows, cols);
+    int start_y = (rows - height) / 2;
+    int start_x = (cols - width) / 2;
+    
+    WINDOW *win = newwin(height, width, start_y, start_x);
+    box(win, 0, 0);
+    wattron(win, COLOR_PAIR(6));
+    mvwprintw(win, 1, (50 - strlen("** PROFILE **"))/2, "** PROFILE **");
+    wattroff(win, COLOR_PAIR(6));
+    
+    mvwprintw(win, 10, 5, "Player: %s", name);
+    mvwprintw(win, 11, 5, "Total Score: %d", total_score);
+    mvwprintw(win, 12, 5, "Total Gold: %d", total_gold);
+    mvwprintw(win, 13, 5, "Games Played: %d", games_played);
+    
+    int height2 = 6, width2 = 40;
+    int y2 = 2, x2 = (width - width2) / 2;
+    
+    WINDOW *profile = derwin(win, height2, width2, y2, x2);
+    box(profile, 0, 0);
+    
+    char welcome[] = "Welcome back, Rogue!";
+    int welcome_len = strlen(welcome);
+    int x_posw = (width2 - welcome_len) / 2;
+    
+    mvwprintw(profile, 2, x_posw + 2, "%s", welcome);
+    wattron(profile, COLOR_PAIR(hero_color));
+
+    mvwprintw(profile, 1, 1, "  |\\_/|");
+    mvwprintw(profile, 2, 1, "  `o.o'");
+    mvwprintw(profile, 3, 1, "  =(_)=");
+    mvwprintw(profile, 4, 1, "    U");
+
+    wattroff(profile, COLOR_PAIR(hero_color));
+
+    wrefresh(profile);
+    wrefresh(win);
+    
+    wgetch(win);
+    delwin(profile);
+    delwin(win);
+}
+
+
 void start_game_menu() {
     int ch, choice = 0;
     const char *menu_name = "** GAME MENU **";
-    const char *options[] = {"New Game", "Continue Previous Game", "Game Settings", "Exit"};
+    const char *options[] = {"New Game", "Continue Previous Game", "Game Settings", "Profile", "Exit"};
     int num_options = sizeof(options) / sizeof(options[0]);
     int height = 12, width = 40;
     int rows, cols;
@@ -3375,7 +3438,11 @@ void start_game_menu() {
                 setting_menu();
                 getch();
                 refresh();
-            } else if (choice == 3) { // Exit
+            } else if (choice == 3) { // Profile
+                show_profile();
+                getch();
+                refresh();
+            } else if (choice == 4) { // Exit
                 play_menu();
                 getch();
                 refresh();
