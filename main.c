@@ -91,6 +91,7 @@ struct weapon {
     char symbol;
     int state;
     int num_collect;
+    int thrown;
 };
 
 struct potion {
@@ -1333,7 +1334,7 @@ void pick_up (int y, int x) {
         int num = 1;
         int type = 1;
         for ( int i = 0; i < weapon_count; i ++) {
-            if (weapons[i].state == -1 && weapons[i].x == x && weapons[i].y == y) {
+            if ((weapons[i].state == -1 || weapons[i].thrown == 1) && weapons[i].x == x && weapons[i].y == y) {
                 symbol = weapons[i].symbol;
                 if (symbol == 'm') type = 1;
                 else if (symbol == 'd') {
@@ -1357,8 +1358,6 @@ void pick_up (int y, int x) {
                 weapons[i].state = 0;
             }
         }
-        mvprintw(0,0, "%d", type);
-        getch();
         messages("picked up weapon", type);
         pocket_count++;
     } else if (map[y][x] == 'p') {
@@ -1648,10 +1647,11 @@ void show_level () {
 void drop_weapon (int x, int y, struct weapon * weapon) {
     weapon->x = x;
     weapon->y = y;
-    weapon->state = -1;
+    weapon->state = 0;
+    weapon->thrown = 1;
     map[y][x] = weapon->symbol;
     weapon->num_collect--;
-    //if (weapon->num_collect == 0) weapon->state = -1;
+    if (weapon->num_collect == 0) weapon->state = -1;
 
 }
 
