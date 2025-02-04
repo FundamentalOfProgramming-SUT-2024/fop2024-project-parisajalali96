@@ -1349,11 +1349,16 @@ void pick_up (int y, int x) {
                     num = 20;
                 }
                 else type = 5;
-                if (num <  weapons[i].num_collect) weapons[i].num_collect++;
-                else weapons[i].num_collect += weapons[i].num_collect;
+                
+                if (weapons[i].num_collect < num) weapons[i].num_collect++;
+               // weapons[i].num_collect ++;
+                //if (num <  weapons[i].num_collect) weapons[i].num_collect++;
+                //else weapons[i].num_collect += weapons[i].num_collect;
                 weapons[i].state = 0;
             }
         }
+        mvprintw(0,0, "%d", type);
+        getch();
         messages("picked up weapon", type);
         pocket_count++;
     } else if (map[y][x] == 'p') {
@@ -1643,10 +1648,11 @@ void show_level () {
 void drop_weapon (int x, int y, struct weapon * weapon) {
     weapon->x = x;
     weapon->y = y;
-    weapon->state = 0;
+    weapon->state = -1;
     map[y][x] = weapon->symbol;
     weapon->num_collect--;
-    if (weapon->num_collect == 0) weapon->state = -1;
+    //if (weapon->num_collect == 0) weapon->state = -1;
+
 }
 
 
