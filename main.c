@@ -1994,15 +1994,33 @@ void food_window () {
 
     int choice = getch();
     choice = choice - '0';
-    if (choice == ex_berry_id) food_choice("Exploding Berries");
-    else if (choice == eth_berry_id) food_choice("Ethereal Berries");
-    else if (choice == pie_id) food_choice("Potionberry Pie");
-    else if (choice == amb_id) food_choice("Ambrosia");
-    else if (choice == cheese_id) food_choice("Slightly Moldy Cheese");
-    else if (choice == biscuit_id) food_choice("Rock-hard Biscuit");
-    else if (choice == steak_id) food_choice("Infernal Steak");
-    else if (choice == meat_id) food_choice("Mystery Meat");
-    else if (choice == apple_id) food_choice("Questionable Apple");
+    if (choice == ex_berry_id) {
+        food_choice("Exploding Berries");
+    }
+    else if (choice == eth_berry_id) {
+        food_choice("Ethereal Berries");
+    }
+    else if (choice == pie_id) {
+        food_choice("Potionberry Pie");
+    }
+    else if (choice == amb_id) {
+        food_choice("Ambrosia");
+    }
+    else if (choice == cheese_id) {
+        food_choice("Slightly Moldy Cheese");
+    }
+    else if (choice == biscuit_id) {
+        food_choice("Rock-hard Biscuit");
+    }
+    else if (choice == steak_id) {
+        food_choice("Infernal Steak");
+    }
+    else if (choice == meat_id) {
+        food_choice("Mystery Meat");
+    }
+    else if (choice == apple_id) {
+        food_choice("Questionable Apple");
+    }
     
     if (choice == 'q') return;
 }
@@ -3499,7 +3517,9 @@ void show_pop_up (char * pop_up, int gb, char * pass) {
     WINDOW *popup = newwin(height, width, start_y, start_x);
     box(popup, 0, 0);
     wattron(popup, (COLOR_PAIR(color) | A_BOLD));
-    if (strcmp(pop_up, "Your password is") == 0) mvwprintw(popup, 5, 3, "%s %s", pop_up, pass);
+    if (strcmp(pop_up, "Your password is") == 0)  {
+        mvwprintw(popup, 5, 3, "%s %s", pop_up, pass);
+    }
     else mvwprintw(popup, 5, (width - strlen(pop_up))/2, "%s", pop_up);
     wattroff(popup, (COLOR_PAIR(color) | A_BOLD));
     wrefresh(popup);
@@ -3780,8 +3800,12 @@ void hall_of_fame() {
         mvwprintw(hall, 5 + i, 2, "%s %-3s %d. %-10s %6d %6d %6d    %6d days",
                   title,rank_symbol, i + 1, ranks[i].name,
                   ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games, days_passed);
-        if (strcmp(ranks[i].name, user_name) == 0) wattroff(hall,( COLOR_PAIR(color) | A_BOLD));
-        else wattroff(hall, COLOR_PAIR(color));
+        if (strcmp(ranks[i].name, user_name) == 0) {
+            wattroff(hall,( COLOR_PAIR(color) | A_BOLD));
+        }
+        else {
+            wattroff(hall, COLOR_PAIR(color));
+        }
     }
 
     wrefresh(hall);
@@ -3820,8 +3844,10 @@ void main_menu() {
                 wattron(menu_win, COLOR_PAIR(5));
                 mvwprintw(menu_win, 3 + i, (width - strlen(options[i])) / 2, "%s", options[i]);
                 wattroff(menu_win, COLOR_PAIR(5));
+                
             } else {
                 mvwprintw(menu_win, 3 + i, (width - strlen(options[i])) / 2, "%s", options[i]);
+                
             }
         }
         
@@ -3833,13 +3859,17 @@ void main_menu() {
         else if (ch == '\n') {
             if (choice == 0) { // Play
                 play_menu();
+                
             } else if (choice == 1) { // Hall of Fame
                 clear();
                 load_hall();
                 hall_of_fame();
                 getch();
+                
             } else if (choice == 2) { // Exit
                 break;
+                
+                
             }
         }
     }
@@ -3980,7 +4010,6 @@ int main() {
     clear();
     lobby_art();
     main_menu();
-    
     getch();
     endwin();
     return 0;
