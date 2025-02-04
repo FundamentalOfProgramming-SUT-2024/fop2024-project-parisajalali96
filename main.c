@@ -3832,58 +3832,79 @@ void hall_of_fame() {
 
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
-    int win_height = score_count + 8;
+    int win_height = 20;
     int win_width = 70;
     int start_y = (rows - win_height) / 2;
     int start_x = (cols - win_width) / 2;
 
+    int each_page = win_height - 8;
+    int pages = (score_count + each_page - 1) / each_page;
+    int cur_page = 0;
+
     WINDOW *hall = newwin(win_height, win_width, start_y, start_x);
-    box(hall, 0, 0);
-    mvwprintw(hall, 1, (win_width - 11) / 2 - 3, "** HALL OF FAME **");
-    wattron(hall, (COLOR_PAIR(6) | A_BOLD));
-    mvwprintw(hall, 3, 2, "RANK       NAME           SCORE    GOLD    GAMES      EXPERIENCE");
-    wattroff(hall, (COLOR_PAIR(6) | A_BOLD));
-    attron(COLOR_PAIR(5));
-    const char *message = "== Honor, glory, and a few questionable decisions led these legends here == ";
-    int message_len = strlen(message);
-    int message_pos = (cols - message_len) / 2;
 
-    mvprintw( 1, message_pos, "");
-
-    for (int i = 0; i < message_len; i++) {
-        mvaddch(1, message_pos + i, message[i]);
-        refresh();
-        usleep(50000);
-    }
-    attroff(COLOR_PAIR(5));
-    
-    time_t current_time = time(NULL);
-
-    for (int i = 0; i < score_count; i++) {
-        int color = (i == 0) ? 5 : (i == 1) ? 2 : (i == 2) ? 4 : 10;
-        char title [30]= "      ";
-        if (i >= 0 && i <= 2) strcpy(title, "LEGEND");
-        if (strcmp(ranks[i].name, user_name) == 0) wattron(hall,( COLOR_PAIR(color) | A_BOLD));
-        else wattron(hall, COLOR_PAIR(color));
-
-        double seconds_passed = difftime(current_time, ranks[i].first_game);
-        int days_passed = seconds_passed / (60 * 60 * 24);
+    int ch;
+    do {
+        werase(hall);
+        box(hall, 0, 0);
+        mvwprintw(hall, 1, (win_width - 11) / 2 - 3, "** HALL OF FAME **");
+        wattron(hall, (COLOR_PAIR(6) | A_BOLD));
+        mvwprintw(hall, 3, 2, "RANK       NAME           SCORE    GOLD    GAMES      EXPERIENCE");
+        wattroff(hall, (COLOR_PAIR(6) | A_BOLD));
         
-        const char *rank_symbol = (i == 0) ? "*" : (i == 1) ? "**" : (i == 2) ? "***" : "   ";
-        mvwprintw(hall, 5 + i, 2, "%s %-3s %d. %-10s %6d %6d %6d    %6d days",
-                  title,rank_symbol, i + 1, ranks[i].name,
-                  ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games, days_passed);
-        if (strcmp(ranks[i].name, user_name) == 0) {
-            wattroff(hall,( COLOR_PAIR(color) | A_BOLD));
-        }
-        else {
-            wattroff(hall, COLOR_PAIR(color));
-        }
-    }
+        attron(COLOR_PAIR(5));
+        const char *message = "== Honor, glory, and a few questionable decisions led these legends here == ";
+        int message_len = strlen(message);
+        int message_pos = (cols - message_len) / 2;
 
-    wrefresh(hall);
-    //mvprintw(0, 0, "Press any key to return.");
-    getch();
+        mvprintw(1, message_pos, "%s", message);
+        attroff(COLOR_PAIR(5));
+           
+        time_t current_time = time(NULL);
+
+        int start_index = cur_page * each_page;
+        int end_index = (start_index + each_page < score_count) ? (start_index + each_page) : score_count;
+
+        for (int i = start_index; i < end_index; i++) {
+            int color = (i == 0) ? 5 : (i == 1) ? 2 : (i == 2) ? 4 : 10;
+            char title[30] = "      ";
+            if (i >= 0 && i <= 2) strcpy(title, "LEGEND");
+
+            if (strcmp(ranks[i].name, user_name) == 0) {
+                wattron(hall, (COLOR_PAIR(color) | A_BOLD));
+            } else {
+                wattron(hall, COLOR_PAIR(color));
+            }
+
+            double seconds_passed = difftime(current_time, ranks[i].first_game);
+            int days_passed = seconds_passed / (60 * 60 * 24);
+
+            const char *rank_symbol = (i == 0) ? "*" : (i == 1) ? "**" : (i == 2) ? "***" : "   ";
+            mvwprintw(hall, 5 + (i - start_index), 2, "%s %-3s %d. %-10s %6d %6d %6d    %6d days",
+                      title, rank_symbol, i + 1, ranks[i].name,
+                      ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games, days_passed);
+
+            if (strcmp(ranks[i].name, user_name) == 0) {
+                wattroff(hall, (COLOR_PAIR(color) | A_BOLD));
+            } else {
+                wattroff(hall, COLOR_PAIR(color));
+            }
+        }
+
+        if (pages > 1) {
+            mvwprintw(hall, win_height - 2, win_width / 2 - 5, "Page %d of %d", cur_page + 1, pages);
+        }
+
+        wrefresh(hall);
+
+        ch = getch();
+        if (ch == KEY_RIGHT && cur_page < pages - 1) {
+            cur_page++;
+        } else if (ch == KEY_LEFT && cur_page > 0) {
+            cur_page--;
+        }
+    } while (ch != 'q' && ch != 'Q');
+
     delwin(hall);
     clear();
     start_game_menu();
