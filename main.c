@@ -18,7 +18,7 @@
 
 #define MAX_SIZE 100
 #define HEIGHT 30
-#define WIDTH 100
+#define WIDTH 120
 #define ROOM_MIN_SIZE 5
 #define ROOM_MAX_SIZE 13
 #define ROOM_COUNT 6
@@ -43,7 +43,7 @@ struct scores {
     int total_gold;
     int total_score;
     int total_games;
-    time_t lastgame;
+    time_t first_game;
 };
 
 struct locked_door {
@@ -154,7 +154,7 @@ time_t last_hunger_update = 0;
 struct picked_up_food pocket_food [9];
 struct gold golds[MAX_FOOD];
 int gold_count = 0;
-int gold = 100;
+int gold = 0;
 int score = 100;
 
 struct weapon weapons[50];
@@ -478,9 +478,15 @@ void messages(char *what_happened, int maybe) {
         attron(COLOR_PAIR(2));
         printw("Select a direction first!");
         attroff(COLOR_PAIR(2));
+    } else if (strcmp(what_happened, "new level") == 0) {
+        attron(COLOR_PAIR(9));
+        printw("Welcome to level %d!", level);
+        attroff(COLOR_PAIR(9));
     }
-    refresh();
+    move(0,0);
     getch();
+    clrtoeol();
+    refresh();
 }
 
 void difficulty() {
@@ -738,6 +744,12 @@ void door_fix(struct ROOM room) {
             if (map[room.y + room.height][x] == '#') {
                 map[room.y + room.height - 1][x] = '+';
             }
+        }
+    }
+    
+    for (int y = room.y + 1; y < room.y + room.height - 1; y ++) {
+        for (int x = room.x + 1 ; x < room.x + room.width - 1; x ++) {
+            if (map[y][x] == '+') map[y][x] = '.';
         }
     }
 }
@@ -1558,6 +1570,7 @@ void render_map() {
 
 void new_level () {
     level++;
+    messages("new level", 0);
     init_map();
     generate_map();
 }
@@ -2909,6 +2922,7 @@ void generate_map (){
                 if (prob == 0) new_room.type = 1;
                 else new_room.type = 0;
             } else new_room.type = 0;
+            door_fix(new_room);
             add_room(new_room);
             add_pillar(new_room);
             add_trap(new_room);
@@ -2926,7 +2940,6 @@ void generate_map (){
                     new_room.y + (new_room.height - 2) / 2
                 );
 
-               door_fix(new_room);
                 fix_edges(new_room);
               // if ( rand () % 6 == 0) locked_door(new_room);
                 if ( rand () % 6 == 0) add_hidden_door(new_room);
@@ -3636,7 +3649,7 @@ void load_hall () {
     if(!file) return;
     
     score_count = 0;
-    while(fscanf(file, "%s %d %d %d %ld", ranks[score_count].name, &ranks[score_count].total_score, &ranks[score_count].total_gold, &ranks[score_count].total_games, &ranks[score_count].lastgame) == 5) {
+    while(fscanf(file, "%s %d %d %d %ld", ranks[score_count].name, &ranks[score_count].total_score, &ranks[score_count].total_gold, &ranks[score_count].total_games, &ranks[score_count].first_game) == 5) {
         score_count++;
     }
     fclose(file);
@@ -3653,7 +3666,7 @@ void save_scores () {
                       &temp_ranks[temp_count].total_score,
                       &temp_ranks[temp_count].total_gold,
                       &temp_ranks[temp_count].total_games,
-                      &temp_ranks[temp_count].lastgame) == 5) {
+                      &temp_ranks[temp_count].first_game) == 5) {
             temp_count++;
         }
         fclose(file);
@@ -3680,7 +3693,7 @@ void save_scores () {
     for (int i = 0; i < temp_count; i++) {
         fprintf(file, "%s %d %d %d %ld\n", temp_ranks[i].name,
                 temp_ranks[i].total_score, temp_ranks[i].total_gold,
-                temp_ranks[i].total_games, temp_ranks[i].lastgame);
+                temp_ranks[i].total_games, temp_ranks[i].first_game);
     }
     
     fclose(file);
@@ -3696,7 +3709,6 @@ void get_score (char* name, int score, int gold) {
             ranks[i].total_score += score;
             ranks[i].total_gold += gold;
             ranks[i].total_games ++;
-            ranks[i].lastgame = current_time;
             found = 1;
             break;
         }
@@ -3707,7 +3719,7 @@ void get_score (char* name, int score, int gold) {
         ranks[score_count].total_score = score;
         ranks[score_count].total_gold = gold;
         ranks[score_count].total_games = 1;
-        ranks[score_count].lastgame = current_time;
+        ranks[score_count].first_game = current_time;
         score_count ++;
     }
     
@@ -3736,8 +3748,7 @@ void hall_of_fame() {
     box(hall, 0, 0);
     mvwprintw(hall, 1, (win_width - 11) / 2 - 3, "** HALL OF FAME **");
     wattron(hall, (COLOR_PAIR(6) | A_BOLD));
-    mvwprintw(hall, 3, 2, "%-5s %-10s   %-10s %-6s %-6s %-15s",
-              "RANK", "NAME", "SCORE", "GOLD", "GAMES", "EXPERIENCE");
+    mvwprintw(hall, 3, 2, "RANK       NAME           SCORE    GOLD    GAMES      EXPERIENCE");
     wattroff(hall, (COLOR_PAIR(6) | A_BOLD));
     attron(COLOR_PAIR(5));
     const char *message = "== Honor, glory, and a few questionable decisions led these legends here == ";
@@ -3753,21 +3764,22 @@ void hall_of_fame() {
     }
     attroff(COLOR_PAIR(5));
     
+    time_t current_time = time(NULL);
+
     for (int i = 0; i < score_count; i++) {
-        int color = (i == 0) ? 5 : (i == 1) ? 6 : (i == 2) ? 4 : 10;
-        char title [30]= "";
+        int color = (i == 0) ? 5 : (i == 1) ? 2 : (i == 2) ? 4 : 10;
+        char title [30]= "      ";
         if (i >= 0 && i <= 2) strcpy(title, "LEGEND");
         if (strcmp(ranks[i].name, user_name) == 0) wattron(hall,( COLOR_PAIR(color) | A_BOLD));
         else wattron(hall, COLOR_PAIR(color));
 
-        char lastgame_str[20];
-        struct tm *time_info = localtime(&ranks[i].lastgame);
-        strftime(lastgame_str, sizeof(lastgame_str), "%b %d, %Y", time_info);
+        double seconds_passed = difftime(current_time, ranks[i].first_game);
+        int days_passed = seconds_passed / (60 * 60 * 24);
         
-        const char *rank_symbol = (i == 0) ? "*" : (i == 1) ? "**" : (i == 2) ? "***" : " ";
-        mvwprintw(hall, 5 + i, 2, "%s %-3s %d. %-10s %6d %6d %6d    %-15s",
+        const char *rank_symbol = (i == 0) ? "*" : (i == 1) ? "**" : (i == 2) ? "***" : "   ";
+        mvwprintw(hall, 5 + i, 2, "%s %-3s %d. %-10s %6d %6d %6d    %6d days",
                   title,rank_symbol, i + 1, ranks[i].name,
-                  ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games, lastgame_str);
+                  ranks[i].total_score, ranks[i].total_gold, ranks[i].total_games, days_passed);
         if (strcmp(ranks[i].name, user_name) == 0) wattroff(hall,( COLOR_PAIR(color) | A_BOLD));
         else wattroff(hall, COLOR_PAIR(color));
     }
