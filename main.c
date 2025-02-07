@@ -1839,15 +1839,12 @@ void hunger_bar (int hunger) {
         }
     }
     addch(']');
-    char state [10];
     mvprintw(LINES -1, COLS - 39 - 56 , "Hunger: ");
-    if (hunger <= 100 && hunger > 80) strcpy(state, "Full");
-    else if (hunger <= 80 && hunger > 60) strcpy(state, "Satisfied");
-    else if (hunger <= 60 && hunger > 40) strcpy(state, "Hungry");
-    else if (hunger <= 40 && hunger > 20) strcpy(state, "Starving");
-    else if (hunger <= 20 && hunger > 0) strcpy(state, "Dying");
-
-    mvprintw(LINES - 1,COLS -8 - 56, "%s", state);
+    if (hunger <= 100 && hunger > 80) mvprintw(LINES - 1,COLS -8 - 56, "Full");
+    else if (hunger <= 80 && hunger > 60) mvprintw(LINES - 1,COLS -8 - 56, "Satisfied");
+    else if (hunger <= 60 && hunger > 40) mvprintw(LINES - 1,COLS -8 - 56, "Hungry");
+    else if (hunger <= 40 && hunger > 20) mvprintw(LINES - 1,COLS -8 - 56, "Starving");
+    else if (hunger <= 20 && hunger > 0) mvprintw(LINES - 1,COLS -8 - 56, "Dying");
     refresh();
 
 }
